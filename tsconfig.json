@@ -2,10 +2,14 @@
   "compilerOptions": {
     "allowJs": true,
     "allowSyntheticDefaultImports": true,
-    "jsx": "react-native", // Bu satırı ekleyin veya güncelleyin
-    "lib": ["DOM", "ESNext"],
+    "jsx": "react-native",
+    "lib": [
+      "DOM",
+      "ESNext"
+    ],
     "moduleResolution": "node",
     "noEmit": true,
     "target": "ESNext"
-  }
+  },
+  "extends": "expo/tsconfig.base"
 }

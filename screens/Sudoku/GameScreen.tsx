@@ -1,10 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView,
-} from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList, Cell } from '../../utils/types';
 import { generateSudoku } from '../../services/sudokuGenerator';
 import { cloneGrid, isComplete } from '../../utils/helpers';
@@ -18,7 +15,9 @@ export default function GameScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'SudokuGame'>>();
   const difficulty = route.params?.difficulty || 'easy';
   const isResumed = route.params?.resume || false;
+  
   const { colors } = useTheme();
+  const styles = getStyles(colors); // Apply dynamic styles
 
   const [grid, setGrid] = useState<Cell[][]>([]);
   const [solution, setSolution] = useState<number[][]>([]);
@@ -50,9 +49,8 @@ export default function GameScreen() {
       setSolution(solution);
       updateNumberUsage(puzzle);
     };
-
     setupGame();
-  }, []);
+  }, [isResumed, difficulty]);
 
   const updateNumberUsage = (grid: Cell[][]) => {
     const usage: { [key: number]: number } = {};
@@ -68,17 +66,12 @@ export default function GameScreen() {
 
   const handleNumberInput = (num: number) => {
     if (!selectedCell) return;
-
     const { row, col } = selectedCell;
     const currentCell = grid[row][col];
     if (currentCell.readOnly) return;
 
     const updatedGrid = cloneGrid(grid);
-    updatedGrid[row][col] = {
-      value: num,
-      readOnly: false,
-      notes: [],
-    };
+    updatedGrid[row][col] = { value: num, readOnly: false, notes: [] };
 
     if (num !== solution[row][col]) {
       setMistakes((m) => {
@@ -98,11 +91,7 @@ export default function GameScreen() {
     if (isComplete(updatedGrid, solution)) {
       clearSavedGame();
       saveStreak();
-      navigation.navigate('SudokuResult', {
-        time,
-        mistakes,
-        difficulty,
-      });
+      navigation.navigate('SudokuResult', { time, mistakes, difficulty });
     }
   };
 
@@ -124,35 +113,26 @@ export default function GameScreen() {
   const renderCell = (cell: Cell, rowIndex: number, colIndex: number) => {
     const isSelected = selectedCell?.row === rowIndex && selectedCell?.col === colIndex;
     const isIncorrect = cell.value !== 0 && cell.value !== solution[rowIndex][colIndex];
-
-    const thickTop = rowIndex % 3 === 0;
-    const thickLeft = colIndex % 3 === 0;
+    
+    // Calculate thick borders for 3x3 grid boxes
     const borderStyle = {
-      borderTopWidth: thickTop ? 2 : 0.5,
-      borderLeftWidth: thickLeft ? 2 : 0.5,
-      borderRightWidth: 0.5,
-      borderBottomWidth: 0.5,
+      borderTopWidth: rowIndex % 3 === 0 ? 2 : 0.5,
+      borderLeftWidth: colIndex % 3 === 0 ? 2 : 0.5,
     };
+
+    let cellBg = 'transparent';
+    if (isSelected) cellBg = colors.selected || colors.input;
+    else if (isIncorrect && !cell.readOnly) cellBg = '#ffcccc';
+    else if (cell.readOnly) cellBg = colors.fixedBackground || 'rgba(150,150,150,0.2)';
 
     return (
       <TouchableOpacity
         key={colIndex}
-        style={[
-          styles.cell,
-          borderStyle,
-          cell.readOnly ? styles.readOnly : styles.editable,
-          isSelected && styles.selected,
-          isIncorrect && !cell.readOnly && styles.incorrect,
-        ]}
+        style={[styles.cell, borderStyle, { backgroundColor: cellBg }]}
         onPress={() => setSelectedCell({ row: rowIndex, col: colIndex })}
       >
         {cell.value !== 0 && (
-          <Text
-            style={[
-              styles.cellText,
-              cell.readOnly ? styles.readOnlyText : styles.userInputText,
-            ]}
-          >
+          <Text style={[styles.cellText, { color: cell.readOnly ? colors.text : colors.userInput || colors.input, fontWeight: cell.readOnly ? 'bold' : 'normal' }]}>
             {cell.value}
           </Text>
         )}
@@ -163,14 +143,14 @@ export default function GameScreen() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.infoBar}>
-        <Text>⏱ {Math.floor(time / 60)}:{(time % 60).toString().padStart(2, '0')}</Text>
-        <Text>❤️ {3 - mistakes}</Text>
-        <Text>🎯 {difficulty}</Text>
+        <Text style={styles.infoText}>⏱ {Math.floor(time / 60)}:{(time % 60).toString().padStart(2, '0')}</Text>
+        <Text style={styles.infoText}>❤️ {3 - mistakes}</Text>
+        <Text style={styles.infoText}>🎯 {difficulty}</Text>
       </View>
 
       <View style={styles.grid}>
         {grid.length === 0 ? (
-          <Text>Sudoku hazırlanıyor...</Text>
+          <Text style={styles.infoText}>Sudoku hazırlanıyor...</Text>
         ) : (
           grid.map((row, rowIndex) => (
             <View key={rowIndex} style={styles.row}>
@@ -199,7 +179,7 @@ export default function GameScreen() {
           return (
             <TouchableOpacity
               key={num}
-              style={[styles.numButton, disabled && { backgroundColor: '#aaa' }]}
+              style={[styles.numButton, { backgroundColor: disabled ? 'rgba(150,150,150,0.3)' : colors.input }]}
               onPress={() => !disabled && handleNumberInput(num)}
               disabled={disabled}
             >
@@ -212,64 +192,21 @@ export default function GameScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    padding: 16,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    backgroundColor: '#fff',
-  },
-  infoBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-    maxWidth: 400,
-    marginBottom: 12,
-  },
-  grid: {
-    width: '100%',
-    maxWidth: 400,
-    aspectRatio: 1,
-    borderWidth: 2,
-    borderColor: '#000',
-  },
+const getStyles = (colors: any) => StyleSheet.create({
+  container: { padding: 16, alignItems: 'center', justifyContent: 'flex-start', flexGrow: 1, backgroundColor: colors.background },
+  infoBar: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', maxWidth: 400, marginBottom: 12 },
+  infoText: { color: colors.text, fontSize: 16 },
+  grid: { width: '100%', maxWidth: 400, aspectRatio: 1, borderWidth: 2, borderColor: colors.text },
   row: { flexDirection: 'row', flex: 1 },
-  cell: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    minWidth: 30,
-    minHeight: 30,
-    borderColor: '#999',
+  cell: { 
+    flex: 1, justifyContent: 'center', alignItems: 'center', 
+    minWidth: 30, minHeight: 30, 
+    borderRightWidth: 0.5, borderBottomWidth: 0.5, borderColor: colors.text 
   },
-  readOnly: { backgroundColor: '#eee' },
-  editable: { backgroundColor: '#fff' },
-  selected: { backgroundColor: '#ccf' },
-  incorrect: { backgroundColor: '#fdd' },
   cellText: { fontSize: 18 },
-  readOnlyText: { color: '#000', fontWeight: 'bold' },
-  userInputText: { color: '#444' },
-  controls: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: '100%',
-    maxWidth: 400,
-    marginVertical: 10,
-  },
-  noteToggle: { fontSize: 16 },
-  inputRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    flexWrap: 'wrap',
-    maxWidth: 400,
-  },
-  numButton: {
-    padding: 12,
-    backgroundColor: '#ddd',
-    margin: 4,
-    borderRadius: 6,
-    width: 40,
-    alignItems: 'center',
-  },
-  numButtonText: { fontSize: 20 },
+  controls: { flexDirection: 'row', justifyContent: 'space-around', width: '100%', maxWidth: 400, marginVertical: 20 },
+  noteToggle: { fontSize: 16, fontWeight: 'bold', color: colors.text },
+  inputRow: { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', maxWidth: 400 },
+  numButton: { padding: 12, margin: 4, borderRadius: 6, width: 45, alignItems: 'center' },
+  numButtonText: { fontSize: 20, fontWeight: 'bold', color: colors.text },
 });

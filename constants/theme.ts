@@ -1,29 +1,43 @@
 // constants/theme.ts
-export const COLORS = {
-    purple: {
-      light: {
-        background: '#f3e9ff',
-        text: '#4b0082',
-        input: '#9370DB',
-      },
-      dark: {
-        background: '#1c1c2d',
-        text: '#d3bdf0',
-        input: '#a77ff0',
-      },
+export const themes = {
+  purple: {
+    light: {
+      background: '#f3e9ff', // Very light purple
+      text: '#4b0082',
+      fixedText: '#555',
+      fixedBackground: '#e3d8f3',
+      selected: '#d0aaff',
+      userInput: '#673ab7',
+      input: '#9370DB',
     },
-    blue: {
-      light: {
-        background: '#e9f3ff',
-        text: '#0050b3',
-        input: '#6aa3ff',
-      },
-      dark: {
-        background: '#0d1b2a',
-        text: '#a0c4ff',
-        input: '#4a90e2',
-      },
+    dark: {
+      background: '#241738', // Deep rich purple instead of black
+      text: '#d3bdf0',
+      fixedText: '#aaa',
+      fixedBackground: '#1b112c', // Even darker purple for the navbar
+      selected: '#a47ffb',
+      userInput: '#bb86fc',
+      input: '#a77ff0',
     },
-    // add more colors...
-  };
-  
+  },
+  blue: {
+    light: {
+      background: '#e9f3ff',
+      text: '#0050b3',
+      fixedText: '#555',
+      fixedBackground: '#d0e6ff',
+      selected: '#9ecfff',
+      userInput: '#1976d2',
+      input: '#6aa3ff',
+    },
+    dark: {
+      background: '#0d1b2a', // Deep navy blue instead of black
+      text: '#a0c4ff',
+      fixedText: '#aaa',
+      fixedBackground: '#060d14', // Very dark navy for the navbar
+      selected: '#6493ce',
+      userInput: '#90caf9',
+      input: '#4a90e2',
+    },
+  },
+};

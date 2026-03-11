@@ -9,12 +9,18 @@ import SudokuDifficulty from '../screens/Sudoku/DifficultyScreen';
 import MinesweeperGameScreen from '../screens/Minesweeper/GameScreen';
 import MinesweeperDifficulty from '../screens/Minesweeper/DifficultyScreen';
 import MinesweeperResultScreen from '../screens/Minesweeper/ResultScreen';
+import { NavBar } from '../components/Navbar';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function AppNavigator() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator
+      id={undefined}
+      screenOptions={{
+        header: () => <NavBar />
+      }}
+    >
       <Stack.Screen name="Home" component={HomeScreen} />
       <Stack.Screen name="SudokuDifficulty" component={SudokuDifficulty} />
       <Stack.Screen name="SudokuGame" component={SudokuGameScreen} />

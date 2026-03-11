@@ -11,7 +11,8 @@ export default function StatsScreen() {
   const [stars, setStars] = useState(0);
   const [streak, setStreak] = useState(0);
   const { colors } = useTheme();
-
+  
+  const styles = getStyles(colors);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   useEffect(() => {
@@ -27,37 +28,52 @@ export default function StatsScreen() {
   }, []);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Text style={[styles.header, { color: colors.text }]}>📈 İstatistikler</Text>
-      <Text style={{ color: colors.text }}>⭐ Toplam Yıldız: {stars}</Text>
-      <Text style={{ color: colors.text }}>🔥 Seri: {streak}</Text>
+    <View style={styles.container}>
+      <Text style={styles.header}>📈 İstatistikler</Text>
+      <Text style={styles.text}>⭐ Toplam Yıldız: {stars}</Text>
+      <Text style={styles.text}>🔥 Seri: {streak}</Text>
 
       <FlatList
         data={history}
         keyExtractor={(_, i) => i.toString()}
         renderItem={({ item }) => (
           <View style={styles.item}>
-            <Text style={{ color: colors.text }}>🗓️ {new Date(item.date).toLocaleDateString()}</Text>
-            <Text style={{ color: colors.text }}>🎮 Zorluk: {item.difficulty}</Text>
-            <Text style={{ color: colors.text }}>⭐ Yıldız: {item.stars}</Text>
-            <Text style={{ color: colors.text }}>
+            <Text style={styles.text}>🗓️ {new Date(item.date).toLocaleDateString()}</Text>
+            <Text style={styles.text}>🎮 Zorluk: {item.difficulty}</Text>
+            <Text style={styles.text}>⭐ Yıldız: {item.stars}</Text>
+            <Text style={styles.text}>
               ⏱️ Süre: {Math.floor(item.time / 60)}:{(item.time % 60).toString().padStart(2, '0')}
             </Text>
           </View>
         )}
       />
 
-      <Button title="🏠 Ana Menüye Dön" onPress={() => navigation.navigate('Home')} />
+      <Button title="🏠 Ana Menüye Dön" color={colors.input} onPress={() => navigation.navigate('Home')} />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { padding: 20, flex: 1 },
-  header: { fontSize: 24, marginBottom: 10 },
+const getStyles = (colors: any) => StyleSheet.create({
+  container: { 
+    padding: 20, 
+    flex: 1,
+    backgroundColor: colors.background
+  },
+  header: { 
+    fontSize: 24, 
+    marginBottom: 10,
+    color: colors.text,
+    fontWeight: 'bold'
+  },
+  text: {
+    color: colors.text,
+    fontSize: 16,
+    marginVertical: 2
+  },
   item: {
     borderBottomWidth: 1,
-    borderColor: '#ccc',
-    paddingVertical: 6,
+    borderColor: 'rgba(150,150,150,0.3)', // Subtle dynamic border
+    paddingVertical: 10,
+    marginVertical: 5
   },
 });

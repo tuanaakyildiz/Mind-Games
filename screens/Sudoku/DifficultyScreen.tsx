@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Button } from 'react-native';
+import { View, Text, Button, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../utils/types';
@@ -10,15 +10,20 @@ type DifficultyScreenNavigationProp = NativeStackNavigationProp<RootStackParamLi
 export default function DifficultyScreen() {
   const navigation = useNavigation<DifficultyScreenNavigationProp>();
   const { colors } = useTheme();
+  
+  // Apply dynamic styles
+  const styles = getStyles(colors);
+  
   const difficulties: RootStackParamList['SudokuGame']['difficulty'][] = ['easy', 'medium', 'hard', 'extreme'];
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Text style={[styles.title, { color: colors.text }]}>Choose Difficulty</Text>
+    <View style={styles.container}>
+      <Text style={styles.title}>Choose Difficulty</Text>
       {difficulties.map((level) => (
         <View key={level} style={styles.button}>
           <Button
             title={level.toUpperCase()}
+            color={colors.input} 
             onPress={() => navigation.navigate('SudokuGame', { difficulty: level })}
           />
         </View>
@@ -27,8 +32,18 @@ export default function DifficultyScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  title: { fontSize: 24, marginBottom: 20 },
-  button: { marginVertical: 5, width: '60%' },
+const getStyles = (colors: any) => StyleSheet.create({
+  container: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    backgroundColor: colors.background // Theme injected
+  },
+  title: { 
+    fontSize: 24, 
+    marginBottom: 20, 
+    fontWeight: 'bold',
+    color: colors.text // Theme injected
+  },
+  button: { marginVertical: 8, width: '60%' },
 });
