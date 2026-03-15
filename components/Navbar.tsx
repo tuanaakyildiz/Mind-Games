@@ -8,6 +8,9 @@ import { useTheme } from '../context/ThemeContext';
 const THEME_OPTIONS = [
   { key: 'purple', hex: '#9370DB' }, // Using your input colors for the swatches
   { key: 'blue', hex: '#6aa3ff' },
+  { key: 'pink', hex: '#ec4899' },
+  { key: 'cyan', hex: '#06b6d4' },
+  { key: 'gray', hex: '#6b7280' },
   // { key: 'green', hex: '#4caf50' }, // Uncomment when you add green to ThemeContext
 ];
 

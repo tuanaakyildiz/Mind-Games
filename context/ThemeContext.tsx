@@ -10,7 +10,7 @@ const ThemeContext = createContext<any>(null);
 
 export const ThemeProvider = ({ children }: any) => {
   const systemScheme = useColorScheme();
-  const [colorKey, setColorKey] = useState<'purple' | 'blue'>('purple');
+  const [colorKey, setColorKey] = useState<'purple' | 'blue' | 'pink' | 'cyan' | 'gray'>('purple');
   const [mode, setMode] = useState<'light' | 'dark'>(systemScheme || 'light');
 
   // Dynamically pulls from the imported file
