@@ -2,7 +2,7 @@
 export const themes = {
   purple: {
     light: {
-      background: '#f3e9ff', // Very light purple
+      background: '#f3e9ff', 
       text: '#4b0082',
       fixedText: '#555',
       fixedBackground: '#e3d8f3',
@@ -11,10 +11,10 @@ export const themes = {
       input: '#9370DB',
     },
     dark: {
-      background: '#241738', // Deep rich purple instead of black
+      background: '#241738', // This is the deep purple for the screen!
       text: '#d3bdf0',
       fixedText: '#aaa',
-      fixedBackground: '#1b112c', // Even darker purple for the navbar
+      fixedBackground: '#1b112c', // Darker purple for the NavBar
       selected: '#a47ffb',
       userInput: '#bb86fc',
       input: '#a77ff0',
@@ -31,10 +31,10 @@ export const themes = {
       input: '#6aa3ff',
     },
     dark: {
-      background: '#0d1b2a', // Deep navy blue instead of black
+      background: '#0d1b2a', // Deep navy blue
       text: '#a0c4ff',
       fixedText: '#aaa',
-      fixedBackground: '#060d14', // Very dark navy for the navbar
+      fixedBackground: '#060d14',
       selected: '#6493ce',
       userInput: '#90caf9',
       input: '#4a90e2',
