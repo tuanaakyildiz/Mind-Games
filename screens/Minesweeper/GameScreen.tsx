@@ -15,7 +15,7 @@ export default function MinesweeperGameScreen() {
   const { rows, cols, mines } = route.params;
 
   const { colors } = useTheme();
-  const styles = getStyles(colors); // Apply dynamic styles
+  const styles = getStyles(colors);
 
   const [board] = useState(() => generateBoard(rows, cols, mines));
   const [revealed, setRevealed] = useState<boolean[][]>(() => Array(rows).fill(null).map(() => Array(cols).fill(false)));
@@ -111,29 +111,32 @@ export default function MinesweeperGameScreen() {
         {board.map((row, r) => (
           <View key={`row-${r}`} style={styles.row}>
             {row.map((cell, c) => (
-              <TouchableOpacity
-                key={`cell-${r}-${c}`}
-                style={[
-                  styles.cell, 
-                  revealed[r][c] ? { backgroundColor: colors.background } : { backgroundColor: 'rgba(255,255,255,0.4)' }
-                ]}
-                onPress={() => revealCell(r, c)}
-                onLongPress={() => toggleFlag(r, c)}
-                delayLongPress={200}
-                activeOpacity={0.7}
-                // 🚨 THE RIGHT-CLICK FIX: 
-                // @ts-expect-error - React Native Web supports this, but strict TypeScript doesn't know about it.
+              /* 🚨 NEW: The wrapping View intercepts the raw web context menu! */
+              <View
+                key={`cell-wrapper-${r}-${c}`}
+                // @ts-expect-error - React Native Web specific prop
                 onContextMenu={(e: any) => {
                   if (Platform.OS === 'web') {
-                    e.preventDefault(); // This definitively stops the browser menu from opening!
-                    toggleFlag(r, c);   // This places or removes the flag
+                    e.preventDefault(); // Definitively stops the browser menu from opening
+                    toggleFlag(r, c);   // Places or removes the flag
                   }
                 }}
               >
-                <Text style={[styles.cellText, { color: getCellColor(cell) }]}>
-                  {flags[r][c] ? '🚩' : (revealed[r][c] ? (cell === 0 ? '' : cell) : '')}
-                </Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.cell, 
+                    revealed[r][c] ? { backgroundColor: colors.background } : { backgroundColor: 'rgba(255,255,255,0.4)' }
+                  ]}
+                  onPress={() => revealCell(r, c)}
+                  onLongPress={() => toggleFlag(r, c)} // Keeps mobile functionality intact!
+                  delayLongPress={200}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.cellText, { color: getCellColor(cell) }]}>
+                    {flags[r][c] ? '🚩' : (revealed[r][c] ? (cell === 0 ? '' : cell) : '')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             ))}
           </View>
         ))}
