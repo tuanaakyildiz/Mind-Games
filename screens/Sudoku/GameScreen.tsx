@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+// 🚨 ADDED Platform for web keyboard detection
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, Cell } from '../../utils/types';
@@ -17,7 +18,7 @@ export default function GameScreen() {
   const isResumed = route.params?.resume || false;
   
   const { colors } = useTheme();
-  const styles = getStyles(colors); // Apply dynamic styles
+  const styles = getStyles(colors);
 
   const [grid, setGrid] = useState<Cell[][]>([]);
   const [solution, setSolution] = useState<number[][]>([]);
@@ -26,11 +27,13 @@ export default function GameScreen() {
   const [time, setTime] = useState(0);
   const [numberUsage, setNumberUsage] = useState<{ [key: number]: number }>({});
 
+  // Timer
   useEffect(() => {
     const timer = setInterval(() => setTime((t) => t + 1), 1000);
     return () => clearInterval(timer);
   }, []);
 
+  // Setup Game
   useEffect(() => {
     const setupGame = async () => {
       if (isResumed) {
@@ -40,23 +43,48 @@ export default function GameScreen() {
           setSolution(saved.solution);
           setTime(saved.time);
           setMistakes(saved.mistakes);
-          updateNumberUsage(saved.grid);
+          updateNumberUsage(saved.grid, saved.solution); // Pass solution to verify
           return;
         }
       }
       const { puzzle, solution } = generateSudoku(difficulty);
       setGrid(puzzle);
       setSolution(solution);
-      updateNumberUsage(puzzle);
+      updateNumberUsage(puzzle, solution);
     };
     setupGame();
   }, [isResumed, difficulty]);
 
-  const updateNumberUsage = (grid: Cell[][]) => {
+  // ✨ NEW: Keyboard / Numpad Listener for Web
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!selectedCell) return; // Ignore if no cell is clicked
+      
+      const key = e.key;
+      // If 1-9 is pressed, trigger input
+      if (['1', '2', '3', '4', '5', '6', '7', '8', '9'].includes(key)) {
+        handleNumberInput(parseInt(key, 10));
+      } 
+      // If Backspace/Delete is pressed, clear the cell (send 0)
+      else if (key === 'Backspace' || key === 'Delete') {
+        handleNumberInput(0);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedCell, grid]); // Dependency array ensures it has the latest cell data
+
+  // ✨ UPDATED: Only counts usage for CORRECT numbers
+  const updateNumberUsage = (currentGrid: Cell[][], currentSolution: number[][]) => {
+    if (!currentSolution.length) return;
     const usage: { [key: number]: number } = {};
-    for (let row of grid) {
-      for (let cell of row) {
-        if (cell.value) {
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
+        const cell = currentGrid[r][c];
+        if (cell.value !== 0 && cell.value === currentSolution[r][c]) {
           usage[cell.value] = (usage[cell.value] || 0) + 1;
         }
       }
@@ -64,15 +92,29 @@ export default function GameScreen() {
     setNumberUsage(usage);
   };
 
+  // ✨ UPDATED: Handles overwriting, clearing, and smart mistake counting
   const handleNumberInput = (num: number) => {
     if (!selectedCell) return;
     const { row, col } = selectedCell;
     const currentCell = grid[row][col];
+
     if (currentCell.readOnly) return;
 
     const updatedGrid = cloneGrid(grid);
+
+    // 1. CLEAR LOGIC: If input is 0 (backspace) OR clicking the same number again
+    if (num === 0 || currentCell.value === num) {
+      updatedGrid[row][col] = { ...currentCell, value: 0 };
+      setGrid(updatedGrid);
+      updateNumberUsage(updatedGrid, solution);
+      saveGame({ grid: updatedGrid, solution, mistakes, time });
+      return; // Stop here, no mistake counted for clearing!
+    }
+
+    // 2. OVERWRITE LOGIC: Apply the new number
     updatedGrid[row][col] = { value: num, readOnly: false, notes: [] };
 
+    // 3. MISTAKE LOGIC: Only punish if the NEW number is wrong
     if (num !== solution[row][col]) {
       setMistakes((m) => {
         const newMistakes = m + 1;
@@ -85,7 +127,7 @@ export default function GameScreen() {
     }
 
     setGrid(updatedGrid);
-    updateNumberUsage(updatedGrid);
+    updateNumberUsage(updatedGrid, solution);
     saveGame({ grid: updatedGrid, solution, mistakes, time });
 
     if (isComplete(updatedGrid, solution)) {
@@ -103,15 +145,15 @@ export default function GameScreen() {
       updatedGrid[hint.row][hint.col].readOnly = false;
       updatedGrid[hint.row][hint.col].notes = [];
       setGrid(updatedGrid);
-      updateNumberUsage(updatedGrid);
+      updateNumberUsage(updatedGrid, solution);
       saveGame({ grid: updatedGrid, solution, mistakes, time });
     } else {
       alert("Tüm hücreler dolu!");
     }
   };
 
+  // ✨ UPDATED: Crosshairs and Identical Number Highlighting
   const renderCell = (cell: Cell, rowIndex: number, colIndex: number) => {
-    // 1. Is this the exact cell the user just clicked?
     const isSelected = selectedCell?.row === rowIndex && selectedCell?.col === colIndex;
     const isIncorrect = cell.value !== 0 && cell.value !== solution[rowIndex][colIndex];
     
@@ -119,7 +161,7 @@ export default function GameScreen() {
     let isSameNumber = false;
 
     if (selectedCell) {
-      // 2. CROSSHAIR LOGIC: Is it in the same row, column, or 3x3 block?
+      // Calculate Crosshairs (Row, Column, and 3x3 Box)
       if (
         rowIndex === selectedCell.row ||
         colIndex === selectedCell.col ||
@@ -128,26 +170,25 @@ export default function GameScreen() {
         isRelated = true;
       }
 
-      // 3. MATCHING NUMBER LOGIC: Does it have the exact same number as the selected cell?
+      // Calculate Matching Numbers
       const selectedValue = grid[selectedCell.row][selectedCell.col].value;
       if (selectedValue !== 0 && cell.value === selectedValue) {
         isSameNumber = true;
       }
     }
 
-    // 4. Border styling for the 3x3 grid layout
     const borderStyle = {
       borderTopWidth: rowIndex % 3 === 0 ? 2 : 0.5,
       borderLeftWidth: colIndex % 3 === 0 ? 2 : 0.5,
     };
 
-    // 5. COLOR HIERARCHY: Apply the background colors in order of importance
+    // Color Priority hierarchy
     let cellBg = 'transparent';
-    if (isSelected) cellBg = colors.selected; // Darkest highlight for the clicked cell
-    else if (isIncorrect && !cell.readOnly) cellBg = '#ffcccc'; // Red for mistakes
-    else if (isSameNumber) cellBg = colors.highlight; // Highlight all matching numbers on the board
-    else if (isRelated) cellBg = colors.restricted; // Light highlight for the crosshair paths
-    else if (cell.readOnly) cellBg = colors.fixedBackground || 'rgba(150,150,150,0.2)'; // Default gray for given numbers
+    if (isSelected) cellBg = colors.selected;
+    else if (isIncorrect && !cell.readOnly) cellBg = '#ffcccc';
+    else if (isSameNumber) cellBg = colors.highlight; 
+    else if (isRelated) cellBg = colors.restricted; 
+    else if (cell.readOnly) cellBg = colors.fixedBackground || 'rgba(150,150,150,0.2)';
 
     return (
       <TouchableOpacity
@@ -225,11 +266,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   infoText: { color: colors.text, fontSize: 16 },
   grid: { width: '100%', maxWidth: 400, aspectRatio: 1, borderWidth: 2, borderColor: colors.text },
   row: { flexDirection: 'row', flex: 1 },
-  cell: { 
-    flex: 1, justifyContent: 'center', alignItems: 'center', 
-    minWidth: 30, minHeight: 30, 
-    borderRightWidth: 0.5, borderBottomWidth: 0.5, borderColor: colors.text 
-  },
+  cell: { flex: 1, justifyContent: 'center', alignItems: 'center', minWidth: 30, minHeight: 30, borderRightWidth: 0.5, borderBottomWidth: 0.5, borderColor: colors.text },
   cellText: { fontSize: 18 },
   controls: { flexDirection: 'row', justifyContent: 'space-around', width: '100%', maxWidth: 400, marginVertical: 20 },
   noteToggle: { fontSize: 16, fontWeight: 'bold', color: colors.text },
