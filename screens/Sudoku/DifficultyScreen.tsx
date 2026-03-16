@@ -14,7 +14,7 @@ export default function DifficultyScreen() {
   // Apply dynamic styles
   const styles = getStyles(colors);
   
-  const difficulties: RootStackParamList['SudokuGame']['difficulty'][] = ['easy', 'medium', 'hard', 'extreme'];
+  const difficulties: RootStackParamList['SudokuGame']['difficulty'][] = ['easy', 'medium', 'hard'];
 
   return (
     <View style={styles.container}>
