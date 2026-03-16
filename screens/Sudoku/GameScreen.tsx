@@ -114,15 +114,41 @@ export default function GameScreen() {
     const isSelected = selectedCell?.row === rowIndex && selectedCell?.col === colIndex;
     const isIncorrect = cell.value !== 0 && cell.value !== solution[rowIndex][colIndex];
     
-    // Calculate thick borders for 3x3 grid boxes
+    // 1. Identify what number we are currently "holding"
+    const targetNumber = selectedCell && grid[selectedCell.row][selectedCell.col].value !== 0 
+      ? grid[selectedCell.row][selectedCell.col].value 
+      : null;
+
+    // 2. Logic to check if a blank cell is in the path of the targetNumber
+    let isRestricted = false;
+    if (targetNumber && cell.value === 0) {
+      for (let i = 0; i < 9; i++) {
+        for (let j = 0; j < 9; j++) {
+          if (grid[i][j].value === targetNumber) {
+            const sameRow = i === rowIndex;
+            const sameCol = j === colIndex;
+            const sameBlock = Math.floor(i / 3) === Math.floor(rowIndex / 3) && Math.floor(j / 3) === Math.floor(colIndex / 3);
+            if (sameRow || sameCol || sameBlock) {
+              isRestricted = true;
+            }
+          }
+        }
+      }
+    }
+
+    const isTargetMatch = targetNumber !== null && cell.value === targetNumber;
+
     const borderStyle = {
       borderTopWidth: rowIndex % 3 === 0 ? 2 : 0.5,
       borderLeftWidth: colIndex % 3 === 0 ? 2 : 0.5,
     };
 
+    // 3. Apply the dynamic background colors hierarchically
     let cellBg = 'transparent';
     if (isSelected) cellBg = colors.selected || colors.input;
     else if (isIncorrect && !cell.readOnly) cellBg = '#ffcccc';
+    else if (isTargetMatch) cellBg = colors.highlight; // Highlights all matching numbers!
+    else if (isRestricted) cellBg = colors.restricted; // Lightly highlights restricted paths!
     else if (cell.readOnly) cellBg = colors.fixedBackground || 'rgba(150,150,150,0.2)';
 
     return (

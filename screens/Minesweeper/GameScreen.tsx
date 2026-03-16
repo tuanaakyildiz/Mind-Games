@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { generateBoard } from '../../services/logic';
@@ -115,13 +115,19 @@ export default function MinesweeperGameScreen() {
                 key={`cell-${r}-${c}`}
                 style={[
                   styles.cell, 
-                  // Kept inline because it depends on real-time array data
                   revealed[r][c] ? { backgroundColor: colors.background } : { backgroundColor: 'rgba(255,255,255,0.4)' }
                 ]}
                 onPress={() => revealCell(r, c)}
                 onLongPress={() => toggleFlag(r, c)}
                 delayLongPress={200}
                 activeOpacity={0.7}
+                // 🚨 RIGHT CLICK LOGIC (Web Only)
+                {...(Platform.OS === 'web' ? {
+                  onContextMenu: (e: any) => {
+                    e.preventDefault(); // Prevents the browser right-click menu from opening
+                    toggleFlag(r, c);
+                  }
+                } : {})}
               >
                 <Text style={[styles.cellText, { color: getCellColor(cell) }]}>
                   {flags[r][c] ? '🚩' : (revealed[r][c] ? (cell === 0 ? '' : cell) : '')}
