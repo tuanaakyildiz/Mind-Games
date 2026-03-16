@@ -111,45 +111,43 @@ export default function GameScreen() {
   };
 
   const renderCell = (cell: Cell, rowIndex: number, colIndex: number) => {
+    // 1. Is this the exact cell the user just clicked?
     const isSelected = selectedCell?.row === rowIndex && selectedCell?.col === colIndex;
     const isIncorrect = cell.value !== 0 && cell.value !== solution[rowIndex][colIndex];
     
-    // 1. Identify what number we are currently "holding"
-    const targetNumber = selectedCell && grid[selectedCell.row][selectedCell.col].value !== 0 
-      ? grid[selectedCell.row][selectedCell.col].value 
-      : null;
+    let isRelated = false;
+    let isSameNumber = false;
 
-    // 2. Logic to check if a blank cell is in the path of the targetNumber
-    let isRestricted = false;
-    if (targetNumber && cell.value === 0) {
-      for (let i = 0; i < 9; i++) {
-        for (let j = 0; j < 9; j++) {
-          if (grid[i][j].value === targetNumber) {
-            const sameRow = i === rowIndex;
-            const sameCol = j === colIndex;
-            const sameBlock = Math.floor(i / 3) === Math.floor(rowIndex / 3) && Math.floor(j / 3) === Math.floor(colIndex / 3);
-            if (sameRow || sameCol || sameBlock) {
-              isRestricted = true;
-            }
-          }
-        }
+    if (selectedCell) {
+      // 2. CROSSHAIR LOGIC: Is it in the same row, column, or 3x3 block?
+      if (
+        rowIndex === selectedCell.row ||
+        colIndex === selectedCell.col ||
+        (Math.floor(rowIndex / 3) === Math.floor(selectedCell.row / 3) && Math.floor(colIndex / 3) === Math.floor(selectedCell.col / 3))
+      ) {
+        isRelated = true;
+      }
+
+      // 3. MATCHING NUMBER LOGIC: Does it have the exact same number as the selected cell?
+      const selectedValue = grid[selectedCell.row][selectedCell.col].value;
+      if (selectedValue !== 0 && cell.value === selectedValue) {
+        isSameNumber = true;
       }
     }
 
-    const isTargetMatch = targetNumber !== null && cell.value === targetNumber;
-
+    // 4. Border styling for the 3x3 grid layout
     const borderStyle = {
       borderTopWidth: rowIndex % 3 === 0 ? 2 : 0.5,
       borderLeftWidth: colIndex % 3 === 0 ? 2 : 0.5,
     };
 
-    // 3. Apply the dynamic background colors hierarchically
+    // 5. COLOR HIERARCHY: Apply the background colors in order of importance
     let cellBg = 'transparent';
-    if (isSelected) cellBg = colors.selected || colors.input;
-    else if (isIncorrect && !cell.readOnly) cellBg = '#ffcccc';
-    else if (isTargetMatch) cellBg = colors.highlight; // Highlights all matching numbers!
-    else if (isRestricted) cellBg = colors.restricted; // Lightly highlights restricted paths!
-    else if (cell.readOnly) cellBg = colors.fixedBackground || 'rgba(150,150,150,0.2)';
+    if (isSelected) cellBg = colors.selected; // Darkest highlight for the clicked cell
+    else if (isIncorrect && !cell.readOnly) cellBg = '#ffcccc'; // Red for mistakes
+    else if (isSameNumber) cellBg = colors.highlight; // Highlight all matching numbers on the board
+    else if (isRelated) cellBg = colors.restricted; // Light highlight for the crosshair paths
+    else if (cell.readOnly) cellBg = colors.fixedBackground || 'rgba(150,150,150,0.2)'; // Default gray for given numbers
 
     return (
       <TouchableOpacity
@@ -158,7 +156,10 @@ export default function GameScreen() {
         onPress={() => setSelectedCell({ row: rowIndex, col: colIndex })}
       >
         {cell.value !== 0 && (
-          <Text style={[styles.cellText, { color: cell.readOnly ? colors.text : colors.userInput || colors.input, fontWeight: cell.readOnly ? 'bold' : 'normal' }]}>
+          <Text style={[styles.cellText, { 
+            color: cell.readOnly ? colors.text : (colors.userInput || colors.input), 
+            fontWeight: cell.readOnly ? 'bold' : 'normal' 
+          }]}>
             {cell.value}
           </Text>
         )}

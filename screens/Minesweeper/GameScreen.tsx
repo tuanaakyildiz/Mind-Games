@@ -121,13 +121,14 @@ export default function MinesweeperGameScreen() {
                 onLongPress={() => toggleFlag(r, c)}
                 delayLongPress={200}
                 activeOpacity={0.7}
-                // 🚨 RIGHT CLICK LOGIC (Web Only)
-                {...(Platform.OS === 'web' ? {
-                  onContextMenu: (e: any) => {
-                    e.preventDefault(); // Prevents the browser right-click menu from opening
-                    toggleFlag(r, c);
+                // 🚨 THE RIGHT-CLICK FIX: 
+                // @ts-expect-error - React Native Web supports this, but strict TypeScript doesn't know about it.
+                onContextMenu={(e: any) => {
+                  if (Platform.OS === 'web') {
+                    e.preventDefault(); // This definitively stops the browser menu from opening!
+                    toggleFlag(r, c);   // This places or removes the flag
                   }
-                } : {})}
+                }}
               >
                 <Text style={[styles.cellText, { color: getCellColor(cell) }]}>
                   {flags[r][c] ? '🚩' : (revealed[r][c] ? (cell === 0 ? '' : cell) : '')}
