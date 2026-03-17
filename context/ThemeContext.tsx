@@ -1,19 +1,27 @@
-// context/ThemeContext.tsx
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useColorScheme } from 'react-native';
-
-// 🚨 THIS IS THE MOST IMPORTANT LINE: 
-// It imports the themes from the file above so we never hardcode colors again!
 import { themes } from '../constants/theme'; 
 
 const ThemeContext = createContext<any>(null);
 
 export const ThemeProvider = ({ children }: any) => {
+  // 1. Detect the system's current theme (returns 'light', 'dark', or null/undefined)
   const systemScheme = useColorScheme();
+  
   const [colorKey, setColorKey] = useState<'purple' | 'blue' | 'pink' | 'cyan' | 'gray'>('purple');
-  const [mode, setMode] = useState<'light' | 'dark'>(systemScheme || 'light');
+  
+  // 2. Initialize the app's mode with the system's preference. Fallback to 'dark' if unknown.
+  const [mode, setMode] = useState<'light' | 'dark'>(systemScheme || 'dark');
 
-  // Dynamically pulls from the imported file
+  // 🚨 NEW: Listen for System Theme Changes
+  // If the user changes their phone/computer from Light to Dark while the app is open,
+  // this hook catches it and updates our app's mode immediately.
+  useEffect(() => {
+    if (systemScheme) {
+      setMode(systemScheme);
+    }
+  }, [systemScheme]);
+
   const colors = themes[colorKey][mode];
 
   return (
