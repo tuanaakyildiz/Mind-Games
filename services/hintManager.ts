@@ -58,3 +58,14 @@ export function getMinesweeperHint(board: any[][], revealed: boolean[][], flags:
   const randomIndex = Math.floor(Math.random() * safeHiddenCells.length);
   return safeHiddenCells[randomIndex];
 }
+// ✨ NEW: QUEENS HINT LOGIC
+export function getQueensHint(board: any[][], solution: [number, number][]): { row: number; col: number } | null {
+  // Find all stars in the solution that the user hasn't placed yet
+  const missingStars = solution.filter(([sr, sc]) => board[sr][sc].state !== 'star');
+  
+  if (missingStars.length === 0) return null;
+  
+  // Pick a random unplaced star to reveal to the player
+  const randomStar = missingStars[Math.floor(Math.random() * missingStars.length)];
+  return { row: randomStar[0], col: randomStar[1] };
+}
