@@ -34,6 +34,11 @@ export default function HomeScreen() {
           <Image source={require('../assets/minesweeper.png')} style={styles.image} />
           <Text style={styles.label}>Minesweeper</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('QueensDifficulty')}>
+          <Image source={require('../assets/queens.png')} style={styles.image} />
+          <Text style={styles.label}>Queens</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );

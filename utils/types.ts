@@ -20,6 +20,23 @@ export type RootStackParamList = {
   MinesweeperDifficulty: undefined;
   MinesweeperGame: { rows: number; cols: number; mines: number };
   MinesweeperResult: { time: number; status: 'won' | 'lost' };
+  QueensDifficulty: undefined;
+  QueensGame: { difficulty: 'easy' | 'medium' | 'hard' };
+  QueensResult: { won: boolean; time: number; difficulty: 'easy' | 'medium' | 'hard' };
   
 
 };
+
+
+
+export type CellState = 'empty' | 'star' | 'cross';
+
+export interface QueensCell {
+  row: number;
+  col: number;
+  regionId: number; // 0-4 mapping to your theme colors
+  state: CellState;
+  isError: boolean;
+}
+
+export type QueensBoard = QueensCell[][];

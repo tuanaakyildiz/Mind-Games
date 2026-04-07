@@ -10,6 +10,9 @@ import MinesweeperGameScreen from '../screens/Minesweeper/GameScreen';
 import MinesweeperDifficulty from '../screens/Minesweeper/DifficultyScreen';
 import MinesweeperResultScreen from '../screens/Minesweeper/ResultScreen';
 import { NavBar } from '../components/Navbar';
+import QueensDifficultyScreen from '../screens/Queens/DifficultyScreen';
+import QueensGameScreen from '../screens/Queens/GameScreen';
+import QueensResultScreen from '../screens/Queens/ResultScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -29,6 +32,9 @@ export default function AppNavigator() {
       <Stack.Screen name="MinesweeperDifficulty" component={MinesweeperDifficulty} />
       <Stack.Screen name="MinesweeperGame" component={MinesweeperGameScreen} />
       <Stack.Screen name="MinesweeperResult" component={MinesweeperResultScreen} />
+      <Stack.Screen name="QueensDifficulty" component={QueensDifficultyScreen} />
+      <Stack.Screen name="QueensGame" component={QueensGameScreen} />
+      <Stack.Screen name="QueensResult" component={QueensResultScreen} />
     </Stack.Navigator>
   );
 }
