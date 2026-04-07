@@ -2,28 +2,43 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Platform, ScrollView, useWindowDimensions } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useTheme } from '../../context/ThemeContext';
-import { themes } from '../../constants/theme';
 import { getQueensBoard, validateBoard, isGameWon } from '../../services/queensLogic';
-import { getQueensHint, useHint } from '../../services/hintManager';
+import { getQueensHint } from '../../services/hintManager';
 
-const REGION_COLORS = ['purple', 'blue', 'pink', 'cyan', 'gray', 'purple', 'blue', 'pink', 'cyan'];
+// ✨ NEW: High-contrast, distinct colors specifically for the board regions
+const DISTINCT_REGION_COLORS = [
+  '#FFADAD', // Pastel Red
+  '#FFD6A5', // Pastel Orange
+  '#FDFFB6', // Pastel Yellow
+  '#CAFFBF', // Pastel Green
+  '#9BF6FF', // Pastel Cyan
+  '#A0C4FF', // Pastel Blue
+  '#BDB2FF', // Pastel Purple
+  '#FFC6FF', // Pastel Magenta
+  '#E0E0E0', // Light Gray
+];
 
 export default function GameScreen() {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
-  const { mode, colors } = useTheme();
+  const { colors } = useTheme();
   const { difficulty } = route.params;
   const { width, height } = useWindowDimensions();
 
-  // Initialization: we destructure both the board and the hidden solution
+  // Initialization
   const [gameData] = useState(() => getQueensBoard(difficulty));
   const [board, setBoard] = useState(gameData.board);
   const solution = gameData.solution;
 
+  // Game States
   const [time, setTime] = useState(0);
   const [zoom, setZoom] = useState(1);
-  const [hintCooldown, setHintCooldown] = useState(0);
   const isFinishedRef = useRef(false);
+
+  // ✨ Hint States
+  const [suggestedHint, setSuggestedHint] = useState<{ row: number; col: number } | null>(null);
+  const [hintCooldown, setHintCooldown] = useState(0);
+  const [hintsUsedThisGame, setHintsUsedThisGame] = useState(0);
 
   const zoomIn = () => setZoom(prev => Math.min(prev + 0.2, 2.5));
   const zoomOut = () => setZoom(prev => Math.max(prev - 0.2, 0.5));
@@ -40,6 +55,12 @@ export default function GameScreen() {
 
   const handleCellPress = (r: number, c: number) => {
     if (isFinishedRef.current) return;
+
+    // If they manually tap the suggested hint cell, clear the highlight
+    if (suggestedHint && suggestedHint.row === r && suggestedHint.col === c) {
+      setSuggestedHint(null);
+    }
+
     setBoard(prev => {
       const newBoard = prev.map(row => [...row]);
       const currentState = newBoard[r][c].state;
@@ -69,27 +90,35 @@ export default function GameScreen() {
     });
   };
 
-  // ✨ Hint Logic
-  const handleHint = async () => {
+  // ✨ UNLIMITED 2-STEP HINT SYSTEM
+  const handleHint = () => {
     if (hintCooldown > 0 || isFinishedRef.current) return;
-    
-    // Check if they have tokens in AsyncStorage
-    const hasTokens = await useHint();
-    if (!hasTokens) {
-      alert("No hints remaining! Play more games to earn stars.");
-      return;
-    }
 
-    const hint = getQueensHint(board, solution);
-    if (hint) {
+    // STEP 2: Fill in the highlighted hint
+    if (suggestedHint) {
       setBoard(prev => {
         const newBoard = prev.map(row => [...row]);
-        newBoard[hint.row][hint.col].state = 'star'; // Automatically place the star
+        const { row: sr, col: sc } = suggestedHint;
+        const targetRegionId = newBoard[sr][sc].regionId;
         
-        // Clear out the rest of the row/col automatically for them
-        for(let i=0; i<newBoard.length; i++) {
-          if (i !== hint.col && newBoard[hint.row][i].state === 'empty') newBoard[hint.row][i].state = 'cross';
-          if (i !== hint.row && newBoard[i][hint.col].state === 'empty') newBoard[i][hint.col].state = 'cross';
+        // Place the star
+        newBoard[sr][sc].state = 'star';
+        
+        // Auto-cross out the row, col, diagonals, and region to help the player!
+        const size = newBoard.length;
+        for (let i = 0; i < size; i++) {
+          for (let j = 0; j < size; j++) {
+            if (newBoard[i][j].state === 'empty') {
+              const isSameRow = (i === sr);
+              const isSameCol = (j === sc);
+              const isSameRegion = (newBoard[i][j].regionId === targetRegionId);
+              const isAdjacent = Math.abs(i - sr) <= 1 && Math.abs(j - sc) <= 1;
+
+              if (isSameRow || isSameCol || isSameRegion || isAdjacent) {
+                newBoard[i][j].state = 'cross';
+              }
+            }
+          }
         }
 
         const validatedBoard = validateBoard(newBoard);
@@ -99,15 +128,32 @@ export default function GameScreen() {
         }
         return validatedBoard;
       });
-      setHintCooldown(5); // 5 second lock to prevent spamming
+
+      setSuggestedHint(null);
+
+      // Increment session counter. If >= 3, trigger 60s cooldown.
+      setHintsUsedThisGame(prev => {
+        const newTotal = prev + 1;
+        if (newTotal >= 3) {
+          setHintCooldown(60);
+        }
+        return newTotal;
+      });
+      return;
+    }
+
+    // STEP 1: Highlight the cell
+    const hint = getQueensHint(board, solution);
+    if (hint) {
+      setSuggestedHint(hint);
+    } else {
+      alert("Tüm yıldızlar yerleştirildi veya hata var!");
     }
   };
 
   const getCellBackground = (regionId: number, isError: boolean) => {
-    if (isError) return '#ff4444'; 
-    const colorKey = REGION_COLORS[regionId % REGION_COLORS.length];
-    // @ts-ignore
-    return themes[colorKey][mode].background;
+    if (isError) return '#ff4444'; // Red for rule violation
+    return DISTINCT_REGION_COLORS[regionId % DISTINCT_REGION_COLORS.length];
   };
 
   const size = board.length;
@@ -115,6 +161,16 @@ export default function GameScreen() {
   const maxPossibleHeight = (height - 200) / size;
   const baseCellSize = Math.max(30, Math.min(60, maxPossibleWidth, maxPossibleHeight));
   const baseFontSize = baseCellSize * 0.60;
+
+  // Dynamic Button Text
+  let hintButtonText = '🧠 İpucu';
+  if (hintCooldown > 0) {
+    hintButtonText = `⏳ ${hintCooldown}s`;
+  } else if (suggestedHint) {
+    hintButtonText = '✍️ Onayla';
+  } else if (hintsUsedThisGame < 3) {
+    hintButtonText = `🧠 İpucu (${3 - hintsUsedThisGame})`;
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -126,14 +182,13 @@ export default function GameScreen() {
             <Text style={{ fontSize: 18, color: colors.text }}>🔍-</Text>
           </TouchableOpacity>
           
-          {/* ✨ Hint Button */}
           <TouchableOpacity 
             onPress={handleHint} 
             disabled={hintCooldown > 0}
             style={[styles.hintButton, { borderColor: colors.text }, hintCooldown > 0 && { opacity: 0.5 }]}
           >
             <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.text }}>
-              {hintCooldown > 0 ? `⏳ ${hintCooldown}s` : '🧠 İpucu'}
+              {hintButtonText}
             </Text>
           </TouchableOpacity>
 
@@ -148,32 +203,39 @@ export default function GameScreen() {
           <View style={[styles.boardContainer, { padding: 4 * zoom, borderRadius: 8 * zoom }]}>
             {board.map((row, rIdx) => (
               <View key={`row-${rIdx}`} style={styles.row}>
-                {row.map((cell, cIdx) => (
-                  <View
-                    key={`cell-wrapper-${rIdx}-${cIdx}`}
-                    // @ts-expect-error
-                    onContextMenu={(e: any) => {
-                      if (Platform.OS === 'web') { e.preventDefault(); handleRightClick(rIdx, cIdx); }
-                    }}
-                  >
-                    <TouchableOpacity
-                      style={[
-                        styles.cell,
-                        { 
-                          width: baseCellSize * zoom, height: baseCellSize * zoom, 
-                          backgroundColor: getCellBackground(cell.regionId, cell.isError),
-                          borderColor: colors.text, borderWidth: 1 * Math.max(0.5, zoom),
-                        }
-                      ]}
-                      onPress={() => handleCellPress(rIdx, cIdx)}
-                      activeOpacity={0.6}
+                {row.map((cell, cIdx) => {
+                  // Check if this cell is the current highlighted hint
+                  const isSuggested = suggestedHint?.row === rIdx && suggestedHint?.col === cIdx;
+
+                  return (
+                    <View
+                      key={`cell-wrapper-${rIdx}-${cIdx}`}
+                      // @ts-expect-error
+                      onContextMenu={(e: any) => {
+                        if (Platform.OS === 'web') { e.preventDefault(); handleRightClick(rIdx, cIdx); }
+                      }}
                     >
-                      <Text style={[styles.cellText, { fontSize: baseFontSize * zoom, lineHeight: baseFontSize * zoom * 1.2 }]}>
-                        {cell.state === 'star' ? '👑' : cell.state === 'cross' ? '❌' : ''}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
+                      <TouchableOpacity
+                        style={[
+                          styles.cell,
+                          { 
+                            width: baseCellSize * zoom, height: baseCellSize * zoom, 
+                            backgroundColor: getCellBackground(cell.regionId, cell.isError),
+                            // Thicker, darker border to separate cells clearly
+                            borderColor: isSuggested ? '#FFD700' : 'rgba(0,0,0,0.5)', 
+                            borderWidth: isSuggested ? 3 * zoom : 1 * Math.max(0.5, zoom),
+                          }
+                        ]}
+                        onPress={() => handleCellPress(rIdx, cIdx)}
+                        activeOpacity={0.6}
+                      >
+                        <Text style={[styles.cellText, { fontSize: baseFontSize * zoom, lineHeight: baseFontSize * zoom * 1.2 }]}>
+                          {cell.state === 'star' ? '👑' : cell.state === 'cross' ? '❌' : ''}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
               </View>
             ))}
           </View>

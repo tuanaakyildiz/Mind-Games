@@ -23,7 +23,7 @@ export default function ResultScreen() {
       </Text>
       <TouchableOpacity 
         style={[styles.button, { backgroundColor: colors.input }]}
-        onPress={() => navigation.navigate('HomeScreen')}
+        onPress={() => navigation.navigate('Home')}
       >
         <Text style={{ color: colors.background, fontWeight: 'bold' }}>Back to Home</Text>
       </TouchableOpacity>
