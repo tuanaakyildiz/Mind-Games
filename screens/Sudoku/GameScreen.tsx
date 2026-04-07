@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-// 🚨 ADDED Platform for web keyboard detection
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -8,7 +7,8 @@ import { generateSudoku } from '../../services/sudokuGenerator';
 import { cloneGrid, isComplete } from '../../utils/helpers';
 import { saveStreak, resetStreak } from '../../services/streakManager';
 import { loadGame, saveGame, clearSavedGame } from '../../storage/storageUtils';
-import { getHint } from '../../services/hintManager';
+// 🚨 Removed getStats and useHint since we want unlimited per-game hints!
+import { getSudokuHint } from '../../services/hintManager';
 import { useTheme } from '../../context/ThemeContext';
 
 export default function GameScreen() {
@@ -27,13 +27,23 @@ export default function GameScreen() {
   const [time, setTime] = useState(0);
   const [numberUsage, setNumberUsage] = useState<{ [key: number]: number }>({});
 
-  // Timer
+  // ✨ Hint states for cooldowns and the 2-step focus logic
+  const [hintCooldown, setHintCooldown] = useState(0);
+  const [suggestedHint, setSuggestedHint] = useState<{ row: number, col: number, value: number } | null>(null);
+  
+  // ✨ UNLIMITED TRACKER: Resets to 0 every single time this screen is opened!
+  const [hintsUsedThisGame, setHintsUsedThisGame] = useState(0);
+
+  // ✨ TIMER & COOLDOWN: Simple 1-second interval counter
   useEffect(() => {
-    const timer = setInterval(() => setTime((t) => t + 1), 1000);
+    const timer = setInterval(() => {
+      setTime((t) => t + 1);
+      setHintCooldown((c) => (c > 0 ? c - 1 : 0)); // Countdown hint lock
+    }, 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Setup Game
+  // ✨ SETUP GAME: Loads a saved game or generates a new one based on difficulty
   useEffect(() => {
     const setupGame = async () => {
       if (isResumed) {
@@ -43,7 +53,7 @@ export default function GameScreen() {
           setSolution(saved.solution);
           setTime(saved.time);
           setMistakes(saved.mistakes);
-          updateNumberUsage(saved.grid, saved.solution); // Pass solution to verify
+          updateNumberUsage(saved.grid, saved.solution);
           return;
         }
       }
@@ -55,29 +65,26 @@ export default function GameScreen() {
     setupGame();
   }, [isResumed, difficulty]);
 
-  // ✨ NEW: Keyboard / Numpad Listener for Web
+  // ✨ KEYBOARD LISTENER
   useEffect(() => {
     if (Platform.OS !== 'web') return;
-
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!selectedCell) return; // Ignore if no cell is clicked
-      
+      if (!selectedCell) return; 
       const key = e.key;
-      // If 1-9 is pressed, trigger input
+      const code = e.code; 
       if (['1', '2', '3', '4', '5', '6', '7', '8', '9'].includes(key)) {
         handleNumberInput(parseInt(key, 10));
-      } 
-      // If Backspace/Delete is pressed, clear the cell (send 0)
-      else if (key === 'Backspace' || key === 'Delete') {
+      } else if (code && code.startsWith('Numpad')) {
+        const num = parseInt(code.replace('Numpad', ''), 10);
+        if (num >= 1 && num <= 9) handleNumberInput(num);
+      } else if (key === 'Backspace' || key === 'Delete') {
         handleNumberInput(0);
       }
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedCell, grid]); // Dependency array ensures it has the latest cell data
+  }, [selectedCell, grid]); 
 
-  // ✨ UPDATED: Only counts usage for CORRECT numbers
   const updateNumberUsage = (currentGrid: Cell[][], currentSolution: number[][]) => {
     if (!currentSolution.length) return;
     const usage: { [key: number]: number } = {};
@@ -92,29 +99,23 @@ export default function GameScreen() {
     setNumberUsage(usage);
   };
 
-  // ✨ UPDATED: Handles overwriting, clearing, and smart mistake counting
   const handleNumberInput = (num: number) => {
     if (!selectedCell) return;
     const { row, col } = selectedCell;
     const currentCell = grid[row][col];
-
     if (currentCell.readOnly) return;
-
     const updatedGrid = cloneGrid(grid);
 
-    // 1. CLEAR LOGIC: If input is 0 (backspace) OR clicking the same number again
     if (num === 0 || currentCell.value === num) {
       updatedGrid[row][col] = { ...currentCell, value: 0 };
       setGrid(updatedGrid);
       updateNumberUsage(updatedGrid, solution);
       saveGame({ grid: updatedGrid, solution, mistakes, time });
-      return; // Stop here, no mistake counted for clearing!
+      return; 
     }
 
-    // 2. OVERWRITE LOGIC: Apply the new number
     updatedGrid[row][col] = { value: num, readOnly: false, notes: [] };
 
-    // 3. MISTAKE LOGIC: Only punish if the NEW number is wrong
     if (num !== solution[row][col]) {
       setMistakes((m) => {
         const newMistakes = m + 1;
@@ -124,6 +125,17 @@ export default function GameScreen() {
         }
         return newMistakes;
       });
+    } else {
+      // If they typed the correct number manually into the suggested hint cell...
+      if (suggestedHint && suggestedHint.row === row && suggestedHint.col === col) {
+        setSuggestedHint(null);
+        setHintsUsedThisGame(prev => {
+          const newTotal = prev + 1;
+          // Apply cooldown if they just used their 3rd free hint
+          if (newTotal >= 3) setHintCooldown(60); 
+          return newTotal;
+        });
+      }
     }
 
     setGrid(updatedGrid);
@@ -137,40 +149,64 @@ export default function GameScreen() {
     }
   };
 
+  // ✨ UNLIMITED 2-STEP HINT SYSTEM
   const handleHint = () => {
-    const hint = getHint(grid, solution);
-    if (hint) {
+    if (hintCooldown > 0) return;
+
+    // STEP 2: Fill in the highlighted hint
+    if (suggestedHint) {
       const updatedGrid = cloneGrid(grid);
-      updatedGrid[hint.row][hint.col].value = hint.value;
-      updatedGrid[hint.row][hint.col].readOnly = false;
-      updatedGrid[hint.row][hint.col].notes = [];
+      updatedGrid[suggestedHint.row][suggestedHint.col].value = suggestedHint.value;
+      updatedGrid[suggestedHint.row][suggestedHint.col].readOnly = false;
+      
       setGrid(updatedGrid);
       updateNumberUsage(updatedGrid, solution);
       saveGame({ grid: updatedGrid, solution, mistakes, time });
+      
+      setSuggestedHint(null);
+      
+      // Increment session counter. If it reaches 3, the NEXT hint will make them wait 60s.
+      setHintsUsedThisGame(prev => {
+        const newTotal = prev + 1;
+        if (newTotal >= 3) {
+          setHintCooldown(60);    
+        }
+        return newTotal;
+      });
+      
+      if (isComplete(updatedGrid, solution)) {
+        clearSavedGame();
+        saveStreak();
+        navigation.navigate('SudokuResult', { time, mistakes, difficulty });
+      }
+      return;
+    }
+
+    // STEP 1: Highlight the cell
+    const hint = getSudokuHint(grid, solution);
+    if (hint) {
+      setSuggestedHint(hint);
+      setSelectedCell({ row: hint.row, col: hint.col });
     } else {
       alert("Tüm hücreler dolu!");
     }
   };
 
-  // ✨ UPDATED: Crosshairs and Identical Number Highlighting
   const renderCell = (cell: Cell, rowIndex: number, colIndex: number) => {
     const isSelected = selectedCell?.row === rowIndex && selectedCell?.col === colIndex;
     const isIncorrect = cell.value !== 0 && cell.value !== solution[rowIndex][colIndex];
+    const isSuggestedHint = suggestedHint?.row === rowIndex && suggestedHint?.col === colIndex;
     
     let isRelated = false;
     let isSameNumber = false;
 
     if (selectedCell) {
-      // Calculate Crosshairs (Row, Column, and 3x3 Box)
       if (
-        rowIndex === selectedCell.row ||
-        colIndex === selectedCell.col ||
+        rowIndex === selectedCell.row || colIndex === selectedCell.col ||
         (Math.floor(rowIndex / 3) === Math.floor(selectedCell.row / 3) && Math.floor(colIndex / 3) === Math.floor(selectedCell.col / 3))
       ) {
         isRelated = true;
       }
-
-      // Calculate Matching Numbers
       const selectedValue = grid[selectedCell.row][selectedCell.col].value;
       if (selectedValue !== 0 && cell.value === selectedValue) {
         isSameNumber = true;
@@ -180,15 +216,17 @@ export default function GameScreen() {
     const borderStyle = {
       borderTopWidth: rowIndex % 3 === 0 ? 2 : 0.5,
       borderLeftWidth: colIndex % 3 === 0 ? 2 : 0.5,
+      borderRightWidth: colIndex === 8 ? 2 : 0, 
+      borderBottomWidth: rowIndex === 8 ? 2 : 0,
     };
 
-    // Color Priority hierarchy
     let cellBg = 'transparent';
-    if (isSelected) cellBg = colors.selected;
-    else if (isIncorrect && !cell.readOnly) cellBg = '#ffcccc';
+    if (isSuggestedHint) cellBg = 'rgba(255, 215, 0, 0.4)';
+    else if (isSelected) cellBg = colors.selected; 
+    else if (isIncorrect && !cell.readOnly) cellBg = '#ffcccc'; 
     else if (isSameNumber) cellBg = colors.highlight; 
     else if (isRelated) cellBg = colors.restricted; 
-    else if (cell.readOnly) cellBg = colors.fixedBackground || 'rgba(150,150,150,0.2)';
+    else if (cell.readOnly) cellBg = colors.fixedBackground || 'rgba(150,150,150,0.2)'; 
 
     return (
       <TouchableOpacity
@@ -207,6 +245,16 @@ export default function GameScreen() {
       </TouchableOpacity>
     );
   };
+
+  // ✨ Dynamic Button Text Logic
+  let hintButtonText = '🧠 İpucu';
+  if (hintCooldown > 0) {
+    hintButtonText = `⏳ ${hintCooldown}s`;
+  } else if (suggestedHint) {
+    hintButtonText = `🔍 Çöz`;
+  } else if (hintsUsedThisGame < 3) {
+    hintButtonText = `🧠 İpucu (${3 - hintsUsedThisGame})`;
+  }
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -229,14 +277,22 @@ export default function GameScreen() {
       </View>
 
       <View style={styles.controls}>
-        <TouchableOpacity onPress={handleHint}>
-          <Text style={styles.noteToggle}>🧠 Hint</Text>
+        {/* ✨ UNLIMITED HINT BUTTON */}
+        <TouchableOpacity 
+          onPress={handleHint} 
+          style={[styles.controlBtn, hintCooldown > 0 && { opacity: 0.5 }]}
+          disabled={hintCooldown > 0}
+        >
+          <Text style={[styles.noteToggle, suggestedHint && { color: '#b8860b' }]}>
+            {hintButtonText}
+          </Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
+
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.controlBtn}>
           <Text style={styles.noteToggle}>🔄 Reset</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate('Home')}>
-          <Text style={styles.noteToggle}>🏠 Ana Sayfa</Text>
+        <TouchableOpacity onPress={() => navigation.navigate('Home')} style={styles.controlBtn}>
+          <Text style={styles.noteToggle}>🏠 Çık</Text>
         </TouchableOpacity>
       </View>
 
@@ -263,14 +319,16 @@ export default function GameScreen() {
 const getStyles = (colors: any) => StyleSheet.create({
   container: { padding: 16, alignItems: 'center', justifyContent: 'flex-start', flexGrow: 1, backgroundColor: colors.background },
   infoBar: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', maxWidth: 400, marginBottom: 12 },
-  infoText: { color: colors.text, fontSize: 16 },
+  infoText: { color: colors.text, fontSize: 16, fontWeight: 'bold' },
   grid: { width: '100%', maxWidth: 400, aspectRatio: 1, borderWidth: 2, borderColor: colors.text },
   row: { flexDirection: 'row', flex: 1 },
-  cell: { flex: 1, justifyContent: 'center', alignItems: 'center', minWidth: 30, minHeight: 30, borderRightWidth: 0.5, borderBottomWidth: 0.5, borderColor: colors.text },
-  cellText: { fontSize: 18 },
+  cell: { flex: 1, justifyContent: 'center', alignItems: 'center', borderColor: colors.text },
+  cellText: { fontSize: 20 },
   controls: { flexDirection: 'row', justifyContent: 'space-around', width: '100%', maxWidth: 400, marginVertical: 20 },
+  controlBtn: { padding: 8, alignItems: 'center' },
   noteToggle: { fontSize: 16, fontWeight: 'bold', color: colors.text },
-  inputRow: { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', maxWidth: 400 },
-  numButton: { padding: 12, margin: 4, borderRadius: 6, width: 45, alignItems: 'center' },
-  numButtonText: { fontSize: 20, fontWeight: 'bold', color: colors.text },
+  
+  inputRow: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', maxWidth: 400, marginTop: 10 },
+  numButton: { flex: 1, marginHorizontal: 3, aspectRatio: 0.8, borderRadius: 8, justifyContent: 'center', alignItems: 'center', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 1 },
+  numButtonText: { fontSize: 22, fontWeight: 'bold', color: colors.text },
 });
