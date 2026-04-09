@@ -1,35 +1,40 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../utils/types';
 import { useTheme } from '../../context/ThemeContext';
 import { checkDailyStatus } from '../../utils/dailyManager';
-
-type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'MinesweeperDifficulty'>;
+import { loadGameState } from '../../storage/storageUtils';
 
 export default function MinesweeperDifficulty() {
-  const navigation = useNavigation<NavigationProp>();
+  const navigation = useNavigation<any>();
   const { colors } = useTheme();
-  const isFocused = useIsFocused(); // Re-runs when screen comes into view
+  const isFocused = useIsFocused(); 
   
   const [dailyCompleted, setDailyCompleted] = useState(false);
+  const [hasSavedGame, setHasSavedGame] = useState(false);
 
   useEffect(() => {
     if (isFocused) {
-      // Check if the minesweeper daily is done
       checkDailyStatus('minesweeper').then(setDailyCompleted);
+      loadGameState('minesweeper').then((saved: any) => setHasSavedGame(!!saved));
     }
   }, [isFocused]);
 
   const styles = getStyles(colors);
 
   return (
-    // 2. Look how clean the JSX is now!
     <View style={styles.container}>
       <Text style={styles.title}>💣 Minesweeper</Text>
 
-      {/* ✨ Daily Challenge Button */}
+      {hasSavedGame && (
+        <TouchableOpacity 
+          style={[styles.resumeButton, { backgroundColor: colors.selected }]} 
+          onPress={() => navigation.navigate('MinesweeperGame', { isResumed: true })}
+        >
+          <Text style={[styles.buttonText, { color: colors.text }]}>⏱️ Kaldığın Yerden Devam Et</Text>
+        </TouchableOpacity>
+      )}
+
       <TouchableOpacity 
         style={[styles.dailyButton, dailyCompleted && { backgroundColor: colors.fixedBackground }]} 
         disabled={dailyCompleted}
@@ -42,7 +47,6 @@ export default function MinesweeperDifficulty() {
 
       <View style={styles.divider} />
 
-      {/* Standard Endless Modes */}
       <TouchableOpacity 
         style={[styles.button, { backgroundColor: colors.input }]} 
         onPress={() => navigation.navigate('MinesweeperGame', { rows: 8, cols: 8, mines: 10, isDaily: false })}
@@ -70,6 +74,7 @@ export default function MinesweeperDifficulty() {
 const getStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
   title: { fontSize: 32, fontWeight: 'bold', marginBottom: 30, color: colors.text },
+  resumeButton: { padding: 18, borderRadius: 12, marginBottom: 15, width: 250, alignItems: 'center', elevation: 3, borderWidth: 1, borderColor: 'rgba(0,0,0,0.1)' },
   dailyButton: { backgroundColor: '#FFD700', padding: 20, borderRadius: 12, marginBottom: 20, width: 250, alignItems: 'center', elevation: 5 },
   dailyButtonText: { color: '#000', fontSize: 18, fontWeight: '900' },
   divider: { height: 2, width: '60%', backgroundColor: '#555', marginVertical: 20, opacity: 0.2 },

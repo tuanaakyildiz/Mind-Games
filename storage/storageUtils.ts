@@ -1,14 +1,26 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export async function saveGame(gameState: any) {
-  await AsyncStorage.setItem('savedGame', JSON.stringify(gameState));
-}
+export const saveGameState = async (gameName: string, state: any) => {
+  try {
+    await AsyncStorage.setItem(`@save_${gameName}`, JSON.stringify(state));
+  } catch (e) {
+    console.error("Failed to save game state:", e);
+  }
+};
 
-export async function loadGame() {
-  const data = await AsyncStorage.getItem('savedGame');
-  return data ? JSON.parse(data) : null;
-}
+export const loadGameState = async (gameName: string) => {
+  try {
+    const data = await AsyncStorage.getItem(`@save_${gameName}`);
+    return data ? JSON.parse(data) : null;
+  } catch (e) {
+    return null;
+  }
+};
 
-export async function clearSavedGame() {
-  await AsyncStorage.removeItem('savedGame');
-}
+export const clearGameState = async (gameName: string) => {
+  try {
+    await AsyncStorage.removeItem(`@save_${gameName}`);
+  } catch (e) {
+    console.error("Failed to clear game state:", e);
+  }
+};

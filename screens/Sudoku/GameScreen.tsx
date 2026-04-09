@@ -1,16 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, ActivityIndicator } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { RootStackParamList, Cell } from '../../utils/types';
+import { Cell } from '../../utils/types';
 import { generateSudoku } from '../../services/sudokuGenerator';
 import { cloneGrid, isComplete } from '../../utils/helpers';
 import { saveStreak, resetStreak } from '../../services/streakManager';
-import { loadGame, saveGame, clearSavedGame } from '../../storage/storageUtils';
 import { getSudokuHint } from '../../services/hintManager';
 import { useTheme } from '../../context/ThemeContext';
 import { getSeededRandom, getTodaySeed, markDailyCompleted } from '../../utils/dailyManager';
 
-// ✨ Gestures
+// ✨ CORRECTED IMPORTS: Now using the unified storage!
+import { saveGameState, loadGameState, clearGameState } from '../../storage/storageUtils';
+
 import { GestureDetector, Gesture, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 
@@ -21,6 +22,7 @@ export default function SudokuGameScreen() {
   
   const { colors } = useTheme();
 
+  const [isLoading, setIsLoading] = useState(true);
   const [grid, setGrid] = useState<Cell[][]>([]);
   const [solution, setSolution] = useState<number[][]>([]);
   const [selectedCell, setSelectedCell] = useState<{ row: number; col: number } | null>(null);
@@ -32,7 +34,6 @@ export default function SudokuGameScreen() {
   const [suggestedHint, setSuggestedHint] = useState<{ row: number, col: number, value: number } | null>(null);
   const [hintsUsedThisGame, setHintsUsedThisGame] = useState(0);
 
-  // ✨ REANIMATED GESTURES
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
 
@@ -54,40 +55,42 @@ export default function SudokuGameScreen() {
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setTime((t) => t + 1);
-      setHintCooldown((c) => (c > 0 ? c - 1 : 0));
+      if (!isLoading) {
+        setTime((t) => t + 1);
+        setHintCooldown((c) => (c > 0 ? c - 1 : 0));
+      }
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [isLoading]);
 
   useEffect(() => {
     const setupGame = async () => {
-      // Ignore saved game if playing Daily
       if (isResumed && !isDaily) {
-        const saved = await loadGame();
+        const saved = await loadGameState('sudoku');
         if (saved) {
           setGrid(saved.grid);
           setSolution(saved.solution);
           setTime(saved.time);
           setMistakes(saved.mistakes);
           updateNumberUsage(saved.grid, saved.solution);
+          setIsLoading(false);
           return;
         }
       }
       
-      // ✨ Fetch RNG based on mode
       const rng = isDaily ? getSeededRandom(getTodaySeed()) : Math.random;
       const generated = generateSudoku(difficulty || 'medium', rng);
       
       setGrid(generated.puzzle);
       setSolution(generated.solution);
       updateNumberUsage(generated.puzzle, generated.solution);
+      setIsLoading(false);
     };
     setupGame();
   }, [isResumed, difficulty, isDaily]);
 
   useEffect(() => {
-    if (Platform.OS !== 'web') return;
+    if (Platform.OS !== 'web' || isLoading) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!selectedCell) return; 
       const key = e.key;
@@ -103,7 +106,7 @@ export default function SudokuGameScreen() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedCell, grid]); 
+  }, [selectedCell, grid, isLoading]); 
 
   const updateNumberUsage = (currentGrid: Cell[][], currentSolution: number[][]) => {
     if (!currentSolution.length) return;
@@ -120,7 +123,7 @@ export default function SudokuGameScreen() {
   };
 
   const handleNumberInput = async (num: number) => {
-    if (!selectedCell) return;
+    if (!selectedCell || isLoading) return;
     const { row, col } = selectedCell;
     const currentCell = grid[row][col];
     if (currentCell.readOnly) return;
@@ -130,7 +133,7 @@ export default function SudokuGameScreen() {
       updatedGrid[row][col] = { ...currentCell, value: 0 };
       setGrid(updatedGrid);
       updateNumberUsage(updatedGrid, solution);
-      if (!isDaily) saveGame({ grid: updatedGrid, solution, mistakes, time });
+      if (!isDaily) saveGameState('sudoku', { grid: updatedGrid, solution, mistakes, time });
       return; 
     }
 
@@ -158,10 +161,10 @@ export default function SudokuGameScreen() {
 
     setGrid(updatedGrid);
     updateNumberUsage(updatedGrid, solution);
-    if (!isDaily) saveGame({ grid: updatedGrid, solution, mistakes, time });
+    if (!isDaily) saveGameState('sudoku', { grid: updatedGrid, solution, mistakes, time });
 
     if (isComplete(updatedGrid, solution)) {
-      clearSavedGame();
+      await clearGameState('sudoku');
       saveStreak();
       if (isDaily) await markDailyCompleted('sudoku');
       navigation.navigate('SudokuResult', { time, mistakes, difficulty, isDaily });
@@ -169,7 +172,7 @@ export default function SudokuGameScreen() {
   };
 
   const handleHint = async () => {
-    if (hintCooldown > 0) return;
+    if (hintCooldown > 0 || isLoading) return;
 
     if (suggestedHint) {
       const updatedGrid = cloneGrid(grid);
@@ -178,7 +181,7 @@ export default function SudokuGameScreen() {
       
       setGrid(updatedGrid);
       updateNumberUsage(updatedGrid, solution);
-      if (!isDaily) saveGame({ grid: updatedGrid, solution, mistakes, time });
+      if (!isDaily) saveGameState('sudoku', { grid: updatedGrid, solution, mistakes, time });
       
       setSuggestedHint(null);
       setHintsUsedThisGame(prev => {
@@ -188,7 +191,7 @@ export default function SudokuGameScreen() {
       });
       
       if (isComplete(updatedGrid, solution)) {
-        clearSavedGame();
+        await clearGameState('sudoku');
         saveStreak();
         if (isDaily) await markDailyCompleted('sudoku');
         navigation.navigate('SudokuResult', { time, mistakes, difficulty, isDaily });
@@ -259,6 +262,14 @@ export default function SudokuGameScreen() {
     );
   };
 
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.text} />
+      </View>
+    );
+  }
+
   let hintButtonText = '🧠 İpucu';
   if (hintCooldown > 0) hintButtonText = `⏳ ${hintCooldown}s`;
   else if (suggestedHint) hintButtonText = `🔍 Çöz`;
@@ -274,27 +285,18 @@ export default function SudokuGameScreen() {
           <Text style={[styles.infoText, { color: colors.text }]}>{isDaily ? '🌟 Daily' : difficulty}</Text>
         </View>
 
-        {/* ✨ Wrapped Grid in GestureDetector */}
         <GestureDetector gesture={pinchGesture}>
           <Animated.View style={[styles.grid, animatedBoardStyle, { borderColor: colors.text }]}>
-            {grid.length === 0 ? (
-              <Text style={{ color: colors.text }}>Sudoku hazırlanıyor...</Text>
-            ) : (
-              grid.map((row, rowIndex) => (
-                <View key={rowIndex} style={styles.row}>
-                  {row.map((cell, colIndex) => renderCell(cell, rowIndex, colIndex))}
-                </View>
-              ))
-            )}
+            {grid.map((row, rowIndex) => (
+              <View key={rowIndex} style={styles.row}>
+                {row.map((cell, colIndex) => renderCell(cell, rowIndex, colIndex))}
+              </View>
+            ))}
           </Animated.View>
         </GestureDetector>
 
         <View style={styles.controls}>
-          <TouchableOpacity 
-            onPress={handleHint} 
-            style={[styles.controlBtn, hintCooldown > 0 && { opacity: 0.5 }]}
-            disabled={hintCooldown > 0}
-          >
+          <TouchableOpacity onPress={handleHint} style={[styles.controlBtn, hintCooldown > 0 && { opacity: 0.5 }]} disabled={hintCooldown > 0}>
             <Text style={[styles.noteToggle, { color: colors.text }, suggestedHint && { color: '#b8860b' }]}>
               {hintButtonText}
             </Text>
@@ -333,7 +335,7 @@ const styles = StyleSheet.create({
   container: { padding: 16, alignItems: 'center', justifyContent: 'flex-start', flexGrow: 1 },
   infoBar: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', maxWidth: 400, marginBottom: 12 },
   infoText: { fontSize: 16, fontWeight: 'bold' },
-  grid: { width: '100%', maxWidth: 400, aspectRatio: 1, borderWidth: 2 },
+  grid: { width: '100%', maxWidth: 400, aspectRatio: 1, borderWidth: 2, backgroundColor: 'transparent' },
   row: { flexDirection: 'row', flex: 1 },
   cell: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   cellText: { fontSize: 20 },

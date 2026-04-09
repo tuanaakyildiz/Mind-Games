@@ -1,40 +1,31 @@
-// screens/Queens/GameScreen.tsx
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Platform, ScrollView, useWindowDimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Platform, ScrollView, useWindowDimensions, ActivityIndicator } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useTheme } from '../../context/ThemeContext';
 import { getQueensBoard, validateBoard, isGameWon } from '../../services/queensLogic';
 import { getQueensHint } from '../../services/hintManager';
 import { getSeededRandom, getTodaySeed, markDailyCompleted } from '../../utils/dailyManager';
+import { saveGameState, loadGameState, clearGameState } from '../../storage/storageUtils';
 
 import { GestureDetector, Gesture, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 
-// ✨ MODE-AWARE PALETTES
-// Soft, bright pastels for Light Mode
 const LIGHT_REGIONS = ['#FFADAD', '#FFD6A5', '#FDFFB6', '#CAFFBF', '#9BF6FF', '#A0C4FF', '#BDB2FF', '#FFC6FF', '#E0E0E0'];
-// Deep, rich jewel tones for Dark Mode (Easy on the eyes, but highly distinct)
 const DARK_REGIONS = ['#783B3B', '#855735', '#7A7A30', '#3B7848', '#357878', '#3B4D78', '#5D3B78', '#78356A', '#555555'];
 
 export default function GameScreen() {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
-  
-  // ✨ Pulling 'mode' from your global ThemeContext
   const { colors, mode } = useTheme();
   
-  const { difficulty, isDaily } = route.params;
+  const { difficulty, isDaily, isResumed } = route.params;
   const { width, height } = useWindowDimensions();
 
-  const [gameData] = useState(() => {
-    const rng = isDaily ? getSeededRandom(getTodaySeed()) : Math.random;
-    return getQueensBoard(difficulty, rng);
-  });
-  
-  const [board, setBoard] = useState(gameData.board);
-  const solution = gameData.solution;
-
+  const [isLoading, setIsLoading] = useState(true);
+  const [board, setBoard] = useState<any[]>([]);
+  const [solution, setSolution] = useState<any[]>([]);
   const [time, setTime] = useState(0);
+
   const [suggestedHint, setSuggestedHint] = useState<{ row: number; col: number } | null>(null);
   const [hintCooldown, setHintCooldown] = useState(0);
   const [hintsUsedThisGame, setHintsUsedThisGame] = useState(0);
@@ -63,23 +54,46 @@ export default function GameScreen() {
   const zoomOut = () => { scale.value = withSpring(Math.max(scale.value - 0.3, 0.5)); savedScale.value = scale.value; };
 
   useEffect(() => {
+    const initGame = async () => {
+      if (isResumed && !isDaily) {
+        const saved = await loadGameState('queens');
+        if (saved) {
+          setBoard(saved.board);
+          setSolution(saved.solution);
+          setTime(saved.time);
+          setIsLoading(false);
+          return;
+        }
+      }
+      
+      const rng = isDaily ? getSeededRandom(getTodaySeed()) : Math.random;
+      const data = getQueensBoard(difficulty || 'medium', rng);
+      setBoard(data.board);
+      setSolution(data.solution);
+      setIsLoading(false);
+    };
+    initGame();
+  }, [isResumed, isDaily, difficulty]);
+
+  useEffect(() => {
     const timer = setInterval(() => {
-      if (!isFinishedRef.current) {
+      if (!isFinishedRef.current && !isLoading) {
         setTime(t => t + 1);
         setHintCooldown(c => (c > 0 ? c - 1 : 0));
       }
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [isLoading]);
 
   const handleWin = async () => {
     isFinishedRef.current = true;
     if (isDaily) await markDailyCompleted('queens');
+    await clearGameState('queens');
     setTimeout(() => navigation.navigate('QueensResult', { won: true, time, difficulty, isDaily }), 500);
   };
 
   const handleCellPress = (r: number, c: number) => {
-    if (isFinishedRef.current) return;
+    if (isFinishedRef.current || isLoading) return;
     if (suggestedHint && suggestedHint.row === r && suggestedHint.col === c) setSuggestedHint(null);
 
     setBoard(prev => {
@@ -91,24 +105,33 @@ export default function GameScreen() {
       else newBoard[r][c].state = 'empty';
 
       const validatedBoard = validateBoard(newBoard);
-      if (isGameWon(validatedBoard)) handleWin();
+      
+      if (isGameWon(validatedBoard)) {
+        handleWin();
+      } else if (!isDaily) {
+        saveGameState('queens', { board: validatedBoard, solution, time, difficulty });
+      }
+      
       return validatedBoard;
     });
   };
 
   const handleRightClick = (r: number, c: number) => {
-    if (isFinishedRef.current) return;
+    if (isFinishedRef.current || isLoading) return;
     setBoard(prev => {
       const newBoard = prev.map(row => [...row]);
       const currentState = newBoard[r][c].state;
       if (currentState === 'cross') newBoard[r][c].state = 'empty';
       else if (currentState === 'empty') newBoard[r][c].state = 'cross';
-      return validateBoard(newBoard);
+      
+      const validatedBoard = validateBoard(newBoard);
+      if (!isDaily) saveGameState('queens', { board: validatedBoard, solution, time, difficulty });
+      return validatedBoard;
     });
   };
 
   const handleHint = () => {
-    if (hintCooldown > 0 || isFinishedRef.current) return;
+    if (hintCooldown > 0 || isFinishedRef.current || isLoading) return;
 
     if (suggestedHint) {
       setBoard(prev => {
@@ -135,7 +158,11 @@ export default function GameScreen() {
         }
 
         const validatedBoard = validateBoard(newBoard);
-        if (isGameWon(validatedBoard)) handleWin();
+        if (isGameWon(validatedBoard)) {
+          handleWin();
+        } else if (!isDaily) {
+          saveGameState('queens', { board: validatedBoard, solution, time, difficulty });
+        }
         return validatedBoard;
       });
 
@@ -153,14 +180,19 @@ export default function GameScreen() {
     else alert("Tüm yıldızlar yerleştirildi veya hata var!");
   };
 
-  // ✨ DYNAMIC COLOR SELECTOR
   const getCellBackground = (regionId: number, isError: boolean) => {
-    if (isError) return '#ff4444'; // Red always overrides for errors
-    
-    // Choose palette based on the global ThemeContext mode
+    if (isError) return '#ff4444'; 
     const palette = mode === 'dark' ? DARK_REGIONS : LIGHT_REGIONS;
     return palette[regionId % palette.length];
   };
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.text} />
+      </View>
+    );
+  }
 
   const size = board.length;
   const maxPossibleWidth = (width - 60) / size;
@@ -202,9 +234,10 @@ export default function GameScreen() {
             
             <GestureDetector gesture={pinchGesture}>
               <Animated.View style={[styles.boardContainer, animatedBoardStyle]}>
-                {board.map((row, rIdx) => (
+                {/* ✨ FIXED: Explicit types added to row, rIdx, cell, and cIdx to satisfy TS7006 */}
+                {board.map((row: any[], rIdx: number) => (
                   <View key={`row-${rIdx}`} style={styles.row}>
-                    {row.map((cell, cIdx) => {
+                    {row.map((cell: any, cIdx: number) => {
                       const isSuggested = suggestedHint?.row === rIdx && suggestedHint?.col === cIdx;
                       return (
                         <View key={`cell-wrapper-${rIdx}-${cIdx}`}
@@ -224,7 +257,6 @@ export default function GameScreen() {
                             onPress={() => handleCellPress(rIdx, cIdx)}
                             activeOpacity={0.6}
                           >
-                            {/* Adjusted LineHeight so emojis are perfectly centered on all platforms */}
                             <Text style={[styles.cellText, { fontSize: baseFontSize, lineHeight: baseFontSize * 1.3 }]}>
                               {cell.state === 'star' ? '👑' : cell.state === 'cross' ? '❌' : ''}
                             </Text>
