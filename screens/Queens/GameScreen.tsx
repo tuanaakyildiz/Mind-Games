@@ -1,3 +1,4 @@
+// screens/Queens/GameScreen.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Platform, ScrollView, useWindowDimensions } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -6,22 +7,25 @@ import { getQueensBoard, validateBoard, isGameWon } from '../../services/queensL
 import { getQueensHint } from '../../services/hintManager';
 import { getSeededRandom, getTodaySeed, markDailyCompleted } from '../../utils/dailyManager';
 
-// ✨ Gesture & Reanimated Imports
 import { GestureDetector, Gesture, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 
-const DISTINCT_REGION_COLORS = ['#FFADAD', '#FFD6A5', '#FDFFB6', '#CAFFBF', '#9BF6FF', '#A0C4FF', '#BDB2FF', '#FFC6FF', '#E0E0E0'];
+// ✨ MODE-AWARE PALETTES
+// Soft, bright pastels for Light Mode
+const LIGHT_REGIONS = ['#FFADAD', '#FFD6A5', '#FDFFB6', '#CAFFBF', '#9BF6FF', '#A0C4FF', '#BDB2FF', '#FFC6FF', '#E0E0E0'];
+// Deep, rich jewel tones for Dark Mode (Easy on the eyes, but highly distinct)
+const DARK_REGIONS = ['#783B3B', '#855735', '#7A7A30', '#3B7848', '#357878', '#3B4D78', '#5D3B78', '#78356A', '#555555'];
 
 export default function GameScreen() {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
-  const { colors } = useTheme();
   
-  // Extract isDaily flag
+  // ✨ Pulling 'mode' from your global ThemeContext
+  const { colors, mode } = useTheme();
+  
   const { difficulty, isDaily } = route.params;
   const { width, height } = useWindowDimensions();
 
-  // ✨ INITIALIZATION: Use Seeded RNG if it's the Daily Challenge!
   const [gameData] = useState(() => {
     const rng = isDaily ? getSeededRandom(getTodaySeed()) : Math.random;
     return getQueensBoard(difficulty, rng);
@@ -30,25 +34,21 @@ export default function GameScreen() {
   const [board, setBoard] = useState(gameData.board);
   const solution = gameData.solution;
 
-  // Game & Hint States
   const [time, setTime] = useState(0);
   const [suggestedHint, setSuggestedHint] = useState<{ row: number; col: number } | null>(null);
   const [hintCooldown, setHintCooldown] = useState(0);
   const [hintsUsedThisGame, setHintsUsedThisGame] = useState(0);
   const isFinishedRef = useRef(false);
 
-  // ✨ REANIMATED SHARED VALUES FOR PINCH-TO-ZOOM
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
 
   const pinchGesture = Gesture.Pinch()
     .onUpdate((e) => {
-      // Clamp zoom between 0.5x and 3.0x
       scale.value = Math.max(0.5, Math.min(savedScale.value * e.scale, 3.0));
     })
     .onEnd(() => {
       savedScale.value = scale.value;
-      // Spring back to 1 if zoomed out too far
       if (scale.value < 0.8) {
         scale.value = withSpring(1);
         savedScale.value = 1;
@@ -59,7 +59,6 @@ export default function GameScreen() {
     transform: [{ scale: scale.value }],
   }));
 
-  // Update manual buttons to use spring physics
   const zoomIn = () => { scale.value = withSpring(Math.min(scale.value + 0.3, 3.0)); savedScale.value = scale.value; };
   const zoomOut = () => { scale.value = withSpring(Math.max(scale.value - 0.3, 0.5)); savedScale.value = scale.value; };
 
@@ -108,7 +107,6 @@ export default function GameScreen() {
     });
   };
 
-  // 2-Step Hint Logic (Same as before)
   const handleHint = () => {
     if (hintCooldown > 0 || isFinishedRef.current) return;
 
@@ -155,12 +153,15 @@ export default function GameScreen() {
     else alert("Tüm yıldızlar yerleştirildi veya hata var!");
   };
 
+  // ✨ DYNAMIC COLOR SELECTOR
   const getCellBackground = (regionId: number, isError: boolean) => {
-    if (isError) return '#ff4444';
-    return DISTINCT_REGION_COLORS[regionId % DISTINCT_REGION_COLORS.length];
+    if (isError) return '#ff4444'; // Red always overrides for errors
+    
+    // Choose palette based on the global ThemeContext mode
+    const palette = mode === 'dark' ? DARK_REGIONS : LIGHT_REGIONS;
+    return palette[regionId % palette.length];
   };
 
-  // Base sizes dynamically calculated based on screen estate
   const size = board.length;
   const maxPossibleWidth = (width - 60) / size;
   const maxPossibleHeight = (height - 200) / size;
@@ -173,7 +174,6 @@ export default function GameScreen() {
   else if (hintsUsedThisGame < 3) hintButtonText = `🧠 İpucu (${3 - hintsUsedThisGame})`;
 
   return (
-    // ✨ Wrap whole screen in GestureHandlerRootView
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         
@@ -200,7 +200,6 @@ export default function GameScreen() {
         <ScrollView style={styles.scrollVertical} contentContainerStyle={styles.scrollContent}>
           <ScrollView horizontal style={styles.scrollHorizontal} contentContainerStyle={styles.scrollContent}>
             
-            {/* ✨ Pinch Gesture applied to the Animated View */}
             <GestureDetector gesture={pinchGesture}>
               <Animated.View style={[styles.boardContainer, animatedBoardStyle]}>
                 {board.map((row, rIdx) => (
@@ -218,14 +217,15 @@ export default function GameScreen() {
                               { 
                                 width: baseCellSize, height: baseCellSize, 
                                 backgroundColor: getCellBackground(cell.regionId, cell.isError),
-                                borderColor: isSuggested ? '#FFD700' : 'rgba(0,0,0,0.5)', 
-                                borderWidth: isSuggested ? 3 : 1, // Removed zoom multipliers since Reanimated handles scale now
+                                borderColor: isSuggested ? '#FFD700' : (mode === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.5)'), 
+                                borderWidth: isSuggested ? 3 : 1, 
                               }
                             ]}
                             onPress={() => handleCellPress(rIdx, cIdx)}
                             activeOpacity={0.6}
                           >
-                            <Text style={[styles.cellText, { fontSize: baseFontSize, lineHeight: baseFontSize * 1.2 }]}>
+                            {/* Adjusted LineHeight so emojis are perfectly centered on all platforms */}
+                            <Text style={[styles.cellText, { fontSize: baseFontSize, lineHeight: baseFontSize * 1.3 }]}>
                               {cell.state === 'star' ? '👑' : cell.state === 'cross' ? '❌' : ''}
                             </Text>
                           </TouchableOpacity>
