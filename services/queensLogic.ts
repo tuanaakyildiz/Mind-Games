@@ -1,7 +1,7 @@
 import { QueensBoard, QueensCell } from '../utils/types';
 
-// Randomly place stars without violating rules
-const placeStars = (size: number): [number, number][] | null => {
+// ✨ Pass rngFunc to the star placer
+const placeStars = (size: number, rngFunc: () => number = Math.random): [number, number][] | null => {
   const board = Array(size).fill(0).map(() => Array(size).fill(false));
   const stars: [number, number][] = [];
 
@@ -17,8 +17,8 @@ const placeStars = (size: number): [number, number][] | null => {
 
   const solve = (row: number): boolean => {
     if (row === size) return true;
-    // Randomize column order for endless variety
-    const cols = Array.from({ length: size }, (_, i) => i).sort(() => Math.random() - 0.5);
+    // ✨ Shuffle using our custom RNG instead of Math.random
+    const cols = Array.from({ length: size }, (_, i) => i).sort(() => rngFunc() - 0.5);
     for (const c of cols) {
       if (isSafe(row, c)) {
         board[row][c] = true;
@@ -35,28 +35,25 @@ const placeStars = (size: number): [number, number][] | null => {
   return stars;
 };
 
-// Grow contiguous regions around the placed stars
-const generateRegions = (size: number, stars: [number, number][]) => {
+// ✨ Pass rngFunc to the region grower
+const generateRegions = (size: number, stars: [number, number][], rngFunc: () => number = Math.random) => {
   const regions = Array(size).fill(0).map(() => Array(size).fill(-1));
   let emptyCount = size * size;
   const frontier: { r: number, c: number, id: number }[] = [];
 
-  // Seed the regions with the stars
   stars.forEach(([r, c], i) => {
     regions[r][c] = i;
     emptyCount--;
     const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
     for (const [dr, dc] of dirs) {
       const nr = r + dr, nc = c + dc;
-      if (nr >= 0 && nr < size && nc >= 0 && nc < size) {
-        frontier.push({ r: nr, c: nc, id: i });
-      }
+      if (nr >= 0 && nr < size && nc >= 0 && nc < size) frontier.push({ r: nr, c: nc, id: i });
     }
   });
 
-  // Randomly grow regions
   while (emptyCount > 0 && frontier.length > 0) {
-    const idx = Math.floor(Math.random() * frontier.length);
+    // ✨ Use custom RNG
+    const idx = Math.floor(rngFunc() * frontier.length);
     const { r, c, id } = frontier.splice(idx, 1)[0];
 
     if (regions[r][c] === -1) {
@@ -74,18 +71,18 @@ const generateRegions = (size: number, stars: [number, number][]) => {
   return regions;
 };
 
-export const getQueensBoard = (difficulty: 'easy' | 'medium' | 'hard'): { board: QueensBoard, solution: [number, number][] } => {
+// ✨ Updated main function accepts the RNG parameter
+export const getQueensBoard = (
+  difficulty: 'easy' | 'medium' | 'hard',
+  rngFunc: () => number = Math.random
+): { board: QueensBoard, solution: [number, number][] } => {
   const size = difficulty === 'hard' ? 9 : difficulty === 'medium' ? 7 : 5;
   
-  // 1. Generate random solution
-  let solution = placeStars(size);
-  // Fallback just in case the randomizer gets stuck
-  while (!solution) solution = placeStars(size); 
+  let solution = placeStars(size, rngFunc);
+  while (!solution) solution = placeStars(size, rngFunc); 
 
-  // 2. Wrap regions around the solution
-  const regions = generateRegions(size, solution);
+  const regions = generateRegions(size, solution, rngFunc);
 
-  // 3. Format it for your UI
   const board = regions.map((row, rIdx) =>
     row.map((regionId, cIdx): QueensCell => ({
       row: rIdx, col: cIdx, regionId, state: 'empty', isError: false,
