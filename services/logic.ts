@@ -1,10 +1,18 @@
-export function generateBoard(rows: number, cols: number, mines: number): (string | number)[][] {
+// ✨ Pass rngFunc as an optional parameter, defaulting to Math.random
+export function generateBoard(
+  rows: number, 
+  cols: number, 
+  mines: number, 
+  rngFunc: () => number = Math.random
+): (string | number)[][] {
   const board: (string | number)[][] = Array.from({ length: rows }, () => Array(cols).fill(0));
 
   let placed = 0;
   while (placed < mines) {
-    const r = Math.floor(Math.random() * rows);
-    const c = Math.floor(Math.random() * cols);
+    // ✨ Use rngFunc() instead of Math.random()
+    const r = Math.floor(rngFunc() * rows);
+    const c = Math.floor(rngFunc() * cols);
+    
     if (board[r][c] === '💣') continue;
     board[r][c] = '💣';
     placed++;

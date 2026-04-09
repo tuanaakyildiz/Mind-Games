@@ -1,24 +1,30 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform, ScrollView } from 'react-native';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Platform, ScrollView, useWindowDimensions } from 'react-native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { generateBoard } from '../../services/logic';
-import { RootStackParamList } from '../../utils/types';
 import { getMinesweeperHint } from '../../services/hintManager';
 import { useTheme } from '../../context/ThemeContext';
+import { getSeededRandom, getTodaySeed, markDailyCompleted } from '../../utils/dailyManager';
 
-type GameRoute = RouteProp<RootStackParamList, 'MinesweeperGame'>;
-type Nav = NativeStackNavigationProp<RootStackParamList>;
+// ✨ Gestures
+import { GestureDetector, Gesture, GestureHandlerRootView } from 'react-native-gesture-handler';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 
 export default function MinesweeperGameScreen() {
-  const route = useRoute<GameRoute>();
-  const navigation = useNavigation<Nav>();
-  const { rows, cols, mines } = route.params;
-
+  const route = useRoute<any>();
+  const navigation = useNavigation<any>();
   const { colors } = useTheme();
-  const styles = getStyles(colors);
+  
+  // ✨ Extract isDaily
+  const { rows, cols, mines, isDaily } = route.params;
+  const { width, height } = useWindowDimensions();
 
-  const [board] = useState(() => generateBoard(rows, cols, mines));
+  // ✨ INITIALIZATION: Seeded RNG for Daily Challenge
+  const [board] = useState(() => {
+    const rng = isDaily ? getSeededRandom(getTodaySeed()) : Math.random;
+    return generateBoard(rows, cols, mines, rng);
+  });
+
   const [revealed, setRevealed] = useState<boolean[][]>(() => Array(rows).fill(null).map(() => Array(cols).fill(false)));
   const [flags, setFlags] = useState<boolean[][]>(() => Array(rows).fill(null).map(() => Array(cols).fill(false)));
   const [gameOver, setGameOver] = useState(false);
@@ -26,21 +32,38 @@ export default function MinesweeperGameScreen() {
   const [lives, setLives] = useState(3);
   const isFinishedRef = useRef(false);
 
-  const [zoom, setZoom] = useState(1);
-  const zoomIn = () => setZoom(prev => Math.min(prev + 0.2, 2.0));
-  const zoomOut = () => setZoom(prev => Math.max(prev - 0.2, 0.4));
-
-  // ✨ Hint Tracking States
+  // Hint States
   const [hintCooldown, setHintCooldown] = useState(0);
-  // ✨ UNLIMITED TRACKER: Starts at 0 every time you play
   const [hintsUsedThisGame, setHintsUsedThisGame] = useState(0); 
 
-  // ✨ TIMER & COOLDOWN
+  // ✨ REANIMATED GESTURES
+  const scale = useSharedValue(1);
+  const savedScale = useSharedValue(1);
+
+  const pinchGesture = Gesture.Pinch()
+    .onUpdate((e) => {
+      scale.value = Math.max(0.4, Math.min(savedScale.value * e.scale, 3.0));
+    })
+    .onEnd(() => {
+      savedScale.value = scale.value;
+      if (scale.value < 0.6) {
+        scale.value = withSpring(1);
+        savedScale.value = 1;
+      }
+    });
+
+  const animatedBoardStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const zoomIn = () => { scale.value = withSpring(Math.min(scale.value + 0.3, 3.0)); savedScale.value = scale.value; };
+  const zoomOut = () => { scale.value = withSpring(Math.max(scale.value - 0.3, 0.4)); savedScale.value = scale.value; };
+
   useEffect(() => {
     const timer = setInterval(() => {
       if (!isFinishedRef.current) {
         setTime((t) => t + 1);
-        setHintCooldown((c) => (c > 0 ? c - 1 : 0)); // Countdown lock
+        setHintCooldown((c) => (c > 0 ? c - 1 : 0));
       }
     }, 1000);
     return () => clearInterval(timer);
@@ -50,8 +73,14 @@ export default function MinesweeperGameScreen() {
     if (isFinishedRef.current) return;
     isFinishedRef.current = true;
     setGameOver(true);
+
+    // ✨ Mark Daily Completed on Win
+    if (status === 'won' && isDaily) {
+      await markDailyCompleted('minesweeper');
+    }
+
     setTimeout(() => {
-      navigation.navigate('MinesweeperResult', { time, status });
+      navigation.navigate('MinesweeperResult', { time, status, isDaily });
     }, 400);
   };
 
@@ -68,10 +97,7 @@ export default function MinesweeperGameScreen() {
       newFlags[r][c] = true;
       setRevealed(newRevealed);
       setFlags(newFlags);
-      if (nextLives <= 0) {
-        handleEndGame('lost');
-        return;
-      }
+      if (nextLives <= 0) return handleEndGame('lost');
     } else {
       if (cell === 0) revealZeros(r, c, newRevealed, newFlags);
       else newRevealed[r][c] = true;
@@ -122,9 +148,7 @@ export default function MinesweeperGameScreen() {
       // Increment the tracker. If this was the 3rd hint, lock the button for 60 seconds!
       setHintsUsedThisGame(prev => {
         const newTotal = prev + 1;
-        if (newTotal >= 3) {
-          setHintCooldown(60);
-        }
+        if (newTotal >= 3) setHintCooldown(60);
         return newTotal;
       });
     }
@@ -134,90 +158,77 @@ export default function MinesweeperGameScreen() {
 
   // ✨ Dynamic Button Text Logic
   let hintButtonText = '🧠 İpucu';
-  if (hintCooldown > 0) {
-    hintButtonText = `⏳ ${hintCooldown}s`;
-  } else if (hintsUsedThisGame < 3) {
-    hintButtonText = `🧠 İpucu (${3 - hintsUsedThisGame})`;
-  }
+  if (hintCooldown > 0) hintButtonText = `⏳ ${hintCooldown}s`;
+  else if (hintsUsedThisGame < 3) hintButtonText = `🧠 İpucu (${3 - hintsUsedThisGame})`;
+
+  // Calculate Base Cell Size
+  const maxPossibleWidth = (width - 60) / cols;
+  const maxPossibleHeight = (height - 200) / rows;
+  const baseCellSize = Math.max(20, Math.min(45, maxPossibleWidth, maxPossibleHeight));
+  const baseFontSize = baseCellSize * 0.65;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerText}>⏱ {time}s | ❤️ {lives} | 🚩 {Math.max(0, mines - currentFlags)}</Text>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         
-        <View style={styles.controlRow}>
-          <TouchableOpacity onPress={zoomOut} style={[styles.zoomButton, { backgroundColor: colors.selected }]}>
-            <Text style={{ fontSize: 18, color: colors.text }}>🔍-</Text>
-          </TouchableOpacity>
+        <View style={[styles.header, { backgroundColor: colors.fixedBackground }]}>
+          <Text style={[styles.headerText, { color: colors.text }]}>
+            ⏱ {time}s | ❤️ {lives} | 🚩 {Math.max(0, mines - currentFlags)} {isDaily && ' | 🌟 Daily'}
+          </Text>
           
-          {/* ✨ DYNAMIC UNLIMITED HINT BUTTON */}
-          <TouchableOpacity 
-            onPress={handleHint} 
-            disabled={hintCooldown > 0}
-            style={[styles.hintButton, hintCooldown > 0 && { opacity: 0.5, borderColor: 'transparent' }]}
-          >
-            <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.text }}>
-              {hintButtonText}
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.controlRow}>
+            <TouchableOpacity onPress={zoomOut} style={[styles.zoomButton, { backgroundColor: colors.selected }]}>
+              <Text style={{ fontSize: 18, color: colors.text }}>🔍-</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity onPress={handleHint} disabled={hintCooldown > 0} style={[styles.hintButton, { borderColor: colors.text }, hintCooldown > 0 && { opacity: 0.5 }]}>
+              <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.text }}>{hintButtonText}</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => navigation.navigate('Home')}>
-            <Text style={styles.exitText}>🏠 Çık</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={zoomIn} style={[styles.zoomButton, { backgroundColor: colors.selected }]}>
-            <Text style={{ fontSize: 18, color: colors.text }}>🔍+</Text>
-          </TouchableOpacity>
+            <TouchableOpacity onPress={zoomIn} style={[styles.zoomButton, { backgroundColor: colors.selected }]}>
+              <Text style={{ fontSize: 18, color: colors.text }}>🔍+</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-      </View>
-
-      <ScrollView style={styles.scrollVertical} contentContainerStyle={styles.scrollContent}>
-        <ScrollView horizontal style={styles.scrollHorizontal} contentContainerStyle={styles.scrollContent}>
-          
-          <View style={[styles.boardContainer, { padding: 6 * zoom, borderRadius: 8 * zoom }]}>
-            {board.map((row, r) => (
-              <View key={`row-${r}`} style={styles.row}>
-                {row.map((cell, c) => (
-                  <View
-                    key={`cell-wrapper-${r}-${c}`}
-                    // @ts-expect-error
-                    onContextMenu={(e: any) => {
-                      if (Platform.OS === 'web') {
-                        e.preventDefault();
-                        toggleFlag(r, c);
-                      }
-                    }}
-                  >
-                    <TouchableOpacity
-                      style={[
-                        styles.cell, 
-                        { 
-                          width: 36 * zoom, 
-                          height: 36 * zoom, 
-                          margin: 1 * zoom,
-                          borderWidth: 1 * Math.max(0.5, zoom) 
-                        },
-                        revealed[r][c] ? { backgroundColor: colors.background } : { backgroundColor: 'rgba(255,255,255,0.4)' }
-                      ]}
-                      onPress={() => revealCell(r, c)}
-                      onLongPress={() => toggleFlag(r, c)}
-                      delayLongPress={200}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.cellText, { color: getCellColor(cell), fontSize: 20 * zoom }]}>
-                        {flags[r][c] ? '🚩' : (revealed[r][c] ? (cell === 0 ? '' : cell) : '')}
-                      </Text>
-                    </TouchableOpacity>
+        <ScrollView style={styles.scrollVertical} contentContainerStyle={styles.scrollContent}>
+          <ScrollView horizontal style={styles.scrollHorizontal} contentContainerStyle={styles.scrollContent}>
+            
+            <GestureDetector gesture={pinchGesture}>
+              <Animated.View style={[styles.boardContainer, animatedBoardStyle, { backgroundColor: colors.input }]}>
+                {board.map((row, r) => (
+                  <View key={`row-${r}`} style={styles.row}>
+                    {row.map((cell, c) => (
+                      <View key={`cell-wrapper-${r}-${c}`}
+                        // @ts-expect-error
+                        onContextMenu={(e: any) => { if (Platform.OS === 'web') { e.preventDefault(); toggleFlag(r, c); } }}
+                      >
+                        <TouchableOpacity
+                          style={[
+                            styles.cell, 
+                            { width: baseCellSize, height: baseCellSize },
+                            revealed[r][c] ? { backgroundColor: colors.background } : { backgroundColor: 'rgba(255,255,255,0.4)' }
+                          ]}
+                          onPress={() => revealCell(r, c)}
+                          onLongPress={() => toggleFlag(r, c)}
+                          delayLongPress={200}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.cellText, { color: getCellColor(cell), fontSize: baseFontSize, lineHeight: baseFontSize * 1.2 }]}>
+                            {flags[r][c] ? '🚩' : (revealed[r][c] ? (cell === 0 ? '' : cell) : '')}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
                   </View>
                 ))}
-              </View>
-            ))}
-          </View>
+              </Animated.View>
+            </GestureDetector>
 
+          </ScrollView>
         </ScrollView>
-      </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </GestureHandlerRootView>
   );
 }
 
@@ -226,22 +237,18 @@ const getCellColor = (val: any) => {
   return colors[val] || '#333';
 };
 
-const getStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  header: { padding: 20, alignItems: 'center', backgroundColor: colors.fixedBackground, elevation: 4, zIndex: 10 },
-  headerText: { fontSize: 22, fontWeight: '800', color: colors.text, marginBottom: 15 },
-  
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  header: { padding: 20, alignItems: 'center', elevation: 4, zIndex: 10 },
+  headerText: { fontSize: 22, fontWeight: '800', marginBottom: 15 },
   controlRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: 350 },
   zoomButton: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8 },
-  hintButton: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 20, borderWidth: 2, borderColor: colors.text },
-  exitText: { color: '#e74c3c', fontSize: 18, fontWeight: 'bold' },
-  
+  hintButton: { paddingVertical: 6, paddingHorizontal: 16, borderRadius: 20, borderWidth: 2 },
   scrollVertical: { flex: 1, width: '100%' },
   scrollHorizontal: { flex: 1 },
   scrollContent: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
-  
-  boardContainer: { backgroundColor: colors.input, elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4 },
+  boardContainer: { elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, padding: 4, borderRadius: 8 },
   row: { flexDirection: 'row' },
-  cell: { justifyContent: 'center', alignItems: 'center', borderColor: 'rgba(0,0,0,0.1)' },
-  cellText: { fontWeight: '900' }
+  cell: { justifyContent: 'center', alignItems: 'center', borderColor: 'rgba(0,0,0,0.1)', borderWidth: 1, margin: 1 },
+  cellText: { fontWeight: '900', textAlign: 'center' }
 });

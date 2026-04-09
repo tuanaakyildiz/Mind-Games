@@ -14,11 +14,11 @@ export type Cell = {
 export type RootStackParamList = {
   Home: undefined;
   SudokuDifficulty: undefined;
-  SudokuGame: { difficulty: "easy" | "medium" | "hard" | "extreme"; resume?: boolean };
+  SudokuGame: { difficulty: "easy" | "medium" | "hard" | "extreme"; resume?: boolean; isDaily?: boolean };
   SudokuResult: { time: number; mistakes: number; difficulty: string };
   SudokuStats: undefined;
   MinesweeperDifficulty: undefined;
-  MinesweeperGame: { rows: number; cols: number; mines: number };
+  MinesweeperGame: { rows: number; cols: number; mines: number; isDaily?: boolean };
   MinesweeperResult: { time: number; status: 'won' | 'lost' };
   QueensDifficulty: undefined;
   QueensGame: { difficulty: 'easy' | 'medium' | 'hard' };
