@@ -13,6 +13,8 @@ import { NavBar } from '../components/Navbar';
 import QueensDifficultyScreen from '../screens/Queens/DifficultyScreen';
 import QueensGameScreen from '../screens/Queens/GameScreen';
 import QueensResultScreen from '../screens/Queens/ResultScreen';
+import ColorConnectDifficultyScreen from '../screens/ColorConnect/DifficultyScreen';
+import ColorConnectGameScreen from '../screens/ColorConnect/GameScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -35,6 +37,8 @@ export default function AppNavigator() {
       <Stack.Screen name="QueensDifficulty" component={QueensDifficultyScreen} />
       <Stack.Screen name="QueensGame" component={QueensGameScreen} />
       <Stack.Screen name="QueensResult" component={QueensResultScreen} />
+      <Stack.Screen name="ColorConnectDifficulty" component={ColorConnectDifficultyScreen} />
+      <Stack.Screen name="ColorConnectGame" component={ColorConnectGameScreen} />
     </Stack.Navigator>
   );
 }

@@ -23,7 +23,8 @@ export type RootStackParamList = {
   QueensDifficulty: undefined;
   QueensGame: { difficulty: 'easy' | 'medium' | 'hard' };
   QueensResult: { won: boolean; time: number; difficulty: 'easy' | 'medium' | 'hard' };
-  
+  ColorConnectDifficulty: undefined;
+  ColorConnectGame: { difficulty: 'easy' | 'medium' | 'hard'; isResumed?: boolean; isDaily?: boolean };
 
 };
 

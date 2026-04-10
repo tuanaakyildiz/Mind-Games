@@ -39,6 +39,10 @@ export default function HomeScreen() {
           <Image source={require('../assets/queens.png')} style={styles.image} />
           <Text style={styles.label}>Queens</Text>
         </TouchableOpacity>
+        <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('ColorConnectDifficulty')}>
+          <Image source={require('../assets/colorConnect.png')} style={styles.image} />
+          <Text style={styles.label}>Color Connect</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
