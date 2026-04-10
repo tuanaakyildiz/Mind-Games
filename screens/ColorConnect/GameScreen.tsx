@@ -114,8 +114,18 @@ export default function GameScreen() {
       if (currentPath.length === 0) return prev;
 
       const lastCell = currentPath[currentPath.length - 1];
-      if (lastCell.r === cell.r && lastCell.c === cell.c) return prev;
 
+      // ✨ BACKTRACK LOGIC: If user reverses into the previous cell, erase the last step!
+      if (currentPath.length >= 2) {
+        const prevCell = currentPath[currentPath.length - 2];
+        if (prevCell.r === cell.r && prevCell.c === cell.c) {
+          let newPaths = { ...prev };
+          newPaths[activeColor] = currentPath.slice(0, -1);
+          return newPaths;
+        }
+      }
+
+      if (lastCell.r === cell.r && lastCell.c === cell.c) return prev;
       if (!isAdjacent(lastCell.r, lastCell.c, cell.r, cell.c)) return prev;
 
       let newPaths = { ...prev };
@@ -212,9 +222,8 @@ export default function GameScreen() {
   const size = board.length;
   const boardDisplaySize = Math.min(width - 40, height - 200, 500); 
   const cellSize = boardDisplaySize / size;
-  const pathThickness = cellSize * 0.35; // Scales cleanly based on board size
+  const pathThickness = cellSize * 0.35; 
 
-  // ✨ NEW: Figure out which directions the pipe needs to flow
   const getCellConnections = (r: number, c: number) => {
     for (const [colorIdStr, path] of Object.entries(paths)) {
       const index = path.findIndex(p => p.r === r && p.c === c);
@@ -280,13 +289,10 @@ export default function GameScreen() {
                     return (
                       <View key={`cell-${r}-${c}`} style={[styles.cell, { width: cellSize, height: cellSize, borderColor: colors.background }]}>
                         
-                        {/* ✨ NEW: Render Continuous Pipe Segments */}
                         {conn && (
                           <>
-                            {/* Center dot to smooth out corners and endpoints */}
                             <View style={{ position: 'absolute', width: pathThickness, height: pathThickness, backgroundColor: conn.color, borderRadius: pathThickness / 2 }} />
                             
-                            {/* Directional pipes connecting to cell edges */}
                             {conn.up && <View style={{ position: 'absolute', top: 0, width: pathThickness, height: '50%', backgroundColor: conn.color }} />}
                             {conn.down && <View style={{ position: 'absolute', bottom: 0, width: pathThickness, height: '50%', backgroundColor: conn.color }} />}
                             {conn.left && <View style={{ position: 'absolute', left: 0, height: pathThickness, width: '50%', backgroundColor: conn.color }} />}
@@ -294,7 +300,6 @@ export default function GameScreen() {
                           </>
                         )}
                         
-                        {/* Render large Endpoints on top of the pipes */}
                         {val !== 0 && (
                           <View style={[styles.endpoint, { backgroundColor: PATH_COLORS[val], width: cellSize * 0.65, height: cellSize * 0.65 }]} />
                         )}

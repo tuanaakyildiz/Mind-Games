@@ -1,68 +1,86 @@
-// screens/HomeScreen.tsx
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, useWindowDimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, useWindowDimensions, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../utils/types';
 import { useTheme } from '../context/ThemeContext';
 
+// ✨ NEW: Use the modern, properly maintained SafeAreaView
+import { SafeAreaView } from 'react-native-safe-area-context';
+
 type HomeNav = NativeStackNavigationProp<RootStackParamList>;
 
 export default function HomeScreen() {
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<HomeNav>();
   const { colors } = useTheme();
-  
-  // Gets real-time screen width
   const { width } = useWindowDimensions(); 
-  // If width is greater than 600px, we treat it as a large screen (web/tablet)
+  
+  // Responsive sizing: If screen is small, take up ~42% width to fit 2 per row. 
+  // If large (tablet/web), cap it at 200px.
   const isLargeScreen = width > 600; 
-
-  const styles = getStyles(colors, isLargeScreen);
+  const cardWidth = isLargeScreen ? 200 : (width * 0.42); 
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Oyun Seç</Text>
-      
-      {/* Wrapper that changes direction based on screen size */}
-      <View style={styles.cardContainer}>
-        <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('SudokuDifficulty')}>
-          <Image source={require('../assets/sudoku.png')} style={styles.image} />
-          <Text style={styles.label}>Sudoku</Text>
-        </TouchableOpacity>
+    // ✨ SafeAreaView automatically pads the bottom so it doesn't hide behind Android navigation buttons
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['right', 'bottom', 'left']}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        
+        <Text style={[styles.title, { color: colors.text }]}>Oyun Seç</Text>
+        
+        <View style={styles.cardContainer}>
+          <TouchableOpacity style={[styles.card, { width: cardWidth, backgroundColor: colors.input }]} onPress={() => navigation.navigate('SudokuDifficulty')}>
+            {/* Replace with your actual icons if different */}
+            <Text style={{fontSize: 50}}>📝</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Sudoku</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('MinesweeperDifficulty')}>
-          <Image source={require('../assets/minesweeper.png')} style={styles.image} />
-          <Text style={styles.label}>Minesweeper</Text>
-        </TouchableOpacity>
+          <TouchableOpacity style={[styles.card, { width: cardWidth, backgroundColor: colors.input }]} onPress={() => navigation.navigate('MinesweeperDifficulty')}>
+            <Text style={{fontSize: 50}}>💣</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Minesweeper</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('QueensDifficulty')}>
-          <Image source={require('../assets/queens.png')} style={styles.image} />
-          <Text style={styles.label}>Queens</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('ColorConnectDifficulty')}>
-          <Image source={require('../assets/colorConnect.png')} style={styles.image} />
-          <Text style={styles.label}>Color Connect</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+          <TouchableOpacity style={[styles.card, { width: cardWidth, backgroundColor: colors.input }]} onPress={() => navigation.navigate('QueensDifficulty')}>
+            <Text style={{fontSize: 50}}>👑</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Queens</Text>
+          </TouchableOpacity>
+
+          {/* New Color Connect Card */}
+          <TouchableOpacity style={[styles.card, { width: cardWidth, backgroundColor: colors.input }]} onPress={() => navigation.navigate('ColorConnectDifficulty')}>
+            <Text style={{fontSize: 50}}>🔗</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Renk Bağmaca</Text>
+          </TouchableOpacity>
+        </View>
+
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
-const getStyles = (colors: any, isLargeScreen: boolean) => StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
-  title: { fontSize: 32, marginBottom: 30, fontWeight: 'bold', color: colors.text },
-  // 🚨 THE RESPONSIVE MAGIC:
+const styles = StyleSheet.create({
+  safeArea: { flex: 1 },
+  scrollContent: { flexGrow: 1, alignItems: 'center', paddingVertical: 30, paddingHorizontal: 10 },
+  title: { fontSize: 32, marginBottom: 30, fontWeight: 'bold' },
+  
+  // ✨ GRID MAGIC: flexDirection row + flexWrap allows items to automatically wrap to the next line
   cardContainer: {
-    flexDirection: isLargeScreen ? 'row' : 'column',
-    gap: 20, // Adds space between cards whether they are stacked or side-by-side
-    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 15, 
     justifyContent: 'center',
+    width: '100%',
+    maxWidth: 800, // Prevents spreading too far on ultra-wide screens
   },
   card: { 
-    alignItems: 'center', padding: 20, borderRadius: 16,
-    backgroundColor: colors.input, width: 220, 
-    elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4,
+    alignItems: 'center', 
+    justifyContent: 'center',
+    padding: 20, 
+    borderRadius: 16,
+    aspectRatio: 1, // Keeps the cards perfectly square!
+    elevation: 3, 
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 2 }, 
+    shadowOpacity: 0.1, 
+    shadowRadius: 4,
   },
-  image: { width: 120, height: 120, resizeMode: 'contain' },
-  label: { marginTop: 12, fontSize: 20, fontWeight: '600', color: colors.text },
+  label: { marginTop: 12, fontSize: 16, fontWeight: '600', textAlign: 'center' },
 });
