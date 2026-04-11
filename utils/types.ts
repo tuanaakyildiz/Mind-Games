@@ -25,8 +25,6 @@ export type RootStackParamList = {
   ColorConnectGame: { difficulty: 'easy' | 'medium' | 'hard'; isResumed?: boolean; isDaily?: boolean };
   ColorConnectResult: { time: number; difficulty: string; isDaily?: boolean; hintsUsed: number };
 
-
-
 };
 
 

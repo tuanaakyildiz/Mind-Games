@@ -5,7 +5,6 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../utils/types';
 import { useTheme } from '../context/ThemeContext';
 
-// ✨ NEW: Use the modern, properly maintained SafeAreaView
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 type HomeNav = NativeStackNavigationProp<RootStackParamList>;
@@ -49,6 +48,7 @@ export default function HomeScreen() {
             <Text style={{fontSize: 50}}>🔗</Text>
             <Text style={[styles.label, { color: colors.text }]}>Renk Bağmaca</Text>
           </TouchableOpacity>
+
         </View>
 
       </ScrollView>

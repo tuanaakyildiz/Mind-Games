@@ -41,10 +41,11 @@ export default function AppNavigator() {
       <Stack.Screen name="QueensDifficulty" component={QueensDifficultyScreen} />
       <Stack.Screen name="QueensGame" component={QueensGameScreen} />
       <Stack.Screen name="QueensResult" component={QueensResultScreen} />
-      
+
       <Stack.Screen name="ColorConnectDifficulty" component={ColorConnectDifficultyScreen} />
       <Stack.Screen name="ColorConnectGame" component={ColorConnectGameScreen} />
       <Stack.Screen name="ColorConnectResult" component={ColorConnectResultScreen} />
+      
     </Stack.Navigator>
   );
 }
