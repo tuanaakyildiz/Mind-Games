@@ -15,6 +15,7 @@ import QueensGameScreen from '../screens/Queens/GameScreen';
 import QueensResultScreen from '../screens/Queens/ResultScreen';
 import ColorConnectDifficultyScreen from '../screens/ColorConnect/DifficultyScreen';
 import ColorConnectGameScreen from '../screens/ColorConnect/GameScreen';
+import ColorConnectResultScreen from '../screens/ColorConnect/ResultScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -27,18 +28,23 @@ export default function AppNavigator() {
       }}
     >
       <Stack.Screen name="Home" component={HomeScreen} />
+
       <Stack.Screen name="SudokuDifficulty" component={SudokuDifficulty} />
       <Stack.Screen name="SudokuGame" component={SudokuGameScreen} />
       <Stack.Screen name="SudokuResult" component={SudokuResultScreen} />
       <Stack.Screen name="SudokuStats" component={SudokuStatsScreen} />
+
       <Stack.Screen name="MinesweeperDifficulty" component={MinesweeperDifficulty} />
       <Stack.Screen name="MinesweeperGame" component={MinesweeperGameScreen} />
       <Stack.Screen name="MinesweeperResult" component={MinesweeperResultScreen} />
+
       <Stack.Screen name="QueensDifficulty" component={QueensDifficultyScreen} />
       <Stack.Screen name="QueensGame" component={QueensGameScreen} />
       <Stack.Screen name="QueensResult" component={QueensResultScreen} />
+      
       <Stack.Screen name="ColorConnectDifficulty" component={ColorConnectDifficultyScreen} />
       <Stack.Screen name="ColorConnectGame" component={ColorConnectGameScreen} />
+      <Stack.Screen name="ColorConnectResult" component={ColorConnectResultScreen} />
     </Stack.Navigator>
   );
 }

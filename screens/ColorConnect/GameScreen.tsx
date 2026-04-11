@@ -68,7 +68,16 @@ export default function GameScreen() {
     isFinishedRef.current = true;
     if (isDaily) await markDailyCompleted('connect');
     await clearGameState('connect');
-    setTimeout(() => navigation.navigate('QueensResult', { won: true, time, difficulty, isDaily }), 500); 
+    
+    // ✨ FIXED: Navigating to the new Result screen and passing hintsUsed
+    setTimeout(() => {
+      navigation.navigate('ColorConnectResult', { 
+        time, 
+        difficulty, 
+        isDaily, 
+        hintsUsed: hintsUsedThisGame 
+      });
+    }, 500); 
   };
 
   const getCellFromCoords = (x: number, y: number) => {
@@ -115,7 +124,6 @@ export default function GameScreen() {
 
       const lastCell = currentPath[currentPath.length - 1];
 
-      // ✨ BACKTRACK LOGIC: If user reverses into the previous cell, erase the last step!
       if (currentPath.length >= 2) {
         const prevCell = currentPath[currentPath.length - 2];
         if (prevCell.r === cell.r && prevCell.c === cell.c) {
