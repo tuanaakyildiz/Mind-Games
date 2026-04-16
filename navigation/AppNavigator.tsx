@@ -17,6 +17,10 @@ import ColorConnectDifficultyScreen from '../screens/ColorConnect/DifficultyScre
 import ColorConnectGameScreen from '../screens/ColorConnect/GameScreen';
 import ColorConnectResultScreen from '../screens/ColorConnect/ResultScreen';
 
+import BlockFillDifficultyScreen from '../screens/BlockFill/DifficultyScreen';
+import BlockFillGameScreen from '../screens/BlockFill/GameScreen';
+import BlockFillResultScreen from '../screens/BlockFill/ResultScreen';
+
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function AppNavigator() {
@@ -45,6 +49,10 @@ export default function AppNavigator() {
       <Stack.Screen name="ColorConnectDifficulty" component={ColorConnectDifficultyScreen} />
       <Stack.Screen name="ColorConnectGame" component={ColorConnectGameScreen} />
       <Stack.Screen name="ColorConnectResult" component={ColorConnectResultScreen} />
+
+      <Stack.Screen name="BlockFillDifficulty" component={BlockFillDifficultyScreen} />
+      <Stack.Screen name="BlockFillGame" component={BlockFillGameScreen} />
+      <Stack.Screen name="BlockFillResult" component={BlockFillResultScreen} />
       
     </Stack.Navigator>
   );

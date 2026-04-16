@@ -25,6 +25,9 @@ export type RootStackParamList = {
   ColorConnectGame: { difficulty: 'easy' | 'medium' | 'hard'; isResumed?: boolean; isDaily?: boolean };
   ColorConnectResult: { time: number; difficulty: string; isDaily?: boolean; hintsUsed: number };
 
+  BlockFillDifficulty: undefined;
+  BlockFillGame: { difficulty: 'easy' | 'medium' | 'hard'; isDaily?: boolean; dailySeed?: number; startDifficultyIndex?: number };
+  BlockFillResult: { time: number; difficulty: string; isDaily?: boolean };
 };
 
 
@@ -41,3 +44,12 @@ export interface QueensCell {
 }
 
 export type QueensBoard = QueensCell[][];
+
+export type BlockFillCellType = 'wall' | 'path';
+
+export interface BlockFillCellData {
+  type: BlockFillCellType;
+  isPainted: boolean;
+}
+
+export type BlockFillBoardData = BlockFillCellData[][];

@@ -49,6 +49,12 @@ export default function HomeScreen() {
             <Text style={[styles.label, { color: colors.text }]}>Renk Bağmaca</Text>
           </TouchableOpacity>
 
+          {/* New Block Fill Card */}
+          <TouchableOpacity style={[styles.card, { width: cardWidth, backgroundColor: colors.input }]} onPress={() => navigation.navigate('BlockFillDifficulty')}>
+            <Text style={{fontSize: 50}}>🎨</Text>
+            <Text style={[styles.label, { color: colors.text }]}>Block Fill</Text>
+          </TouchableOpacity>
+
         </View>
 
       </ScrollView>
